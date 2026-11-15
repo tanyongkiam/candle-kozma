@@ -9,14 +9,12 @@ Inequalities" (version 0.44).
   log_trig_sqrt.ml   Bounds on the logarithm, trigonometric and hyperbolic
                      functions and square roots
   means.ml           Inequalities between means and weighted products
+  binomial_entropy.ml  Binomial coefficients, Stirling's formula and the
+                     binary entropy
 
-To load:
+To load all files:
 
-  needs "kozma/finite_sums.ml";;
-  needs "kozma/combinatorics.ml";;
-  needs "kozma/bernoulli_exp.ml";;
-  needs "kozma/log_trig_sqrt.ml";;
-  needs "kozma/means.ml";;
+  needs "kozma/make.ml";;
 
 Deviations from the sheet:
 
@@ -57,8 +55,9 @@ Deviations from the sheet:
     and w_i >= 0, the third line for w_i >= 0 with sum w_i x_i < 1 (upper
     sign, x_i >= -1) or > -1 (lower sign, x_i <= 1); the left link of the
     second line holds for all x_i >= 0.
-  - Maclaurin-Newton: S_k is symmetric_mean (the mean over k-subsets);
-    both inequalities hold for every k >= 1 and a_i >= 0.
+  - Maclaurin-Newton: S_k is symmetric_mean (the mean over k-subsets).
+    Newton holds for all real a_i and every k >= 1; Maclaurin for every
+    k >= 1 and a_i >= 0.
   - Kraft: the leaves of a binary tree are modelled as a prefix-free set of
     words (a leaf's depth is the length of its word). The inequality is
     proved for every prefix-free set of words over any finite alphabet; for
@@ -102,5 +101,21 @@ Deviations from the sheet:
     its last link x < pi/2; it is also proved multiplied by x on the closed
     interval. x cos^2(x/2) <= sin x and sin x <= x cos(x/2) hold on
     [0, pi], and sin x <= (x cos x + 2x)/3 for all x >= 0.
+  - Binomial (binomial_entropy.ml): the first lower bound of Binomial 1
+    needs k <= n; n^k/k! <= (en/k)^k also holds for k = 0 and real x >= 0
+    in place of n. sqrt n >= k is written k^2 <= n, and n^k/k! (1 -
+    k(k-1)/(2n)) <= C(n,k) holds for all n, k. The central bounds of
+    Binomial 2 hold for n >= 1. Binomial 3: C(tn,k) >= t^k C(n,k) for every
+    natural t. Binomial 4: alpha is a real a with k = a n, 0 < k < n.
+    Binomial 5: d = 0 is included; the second bound needs d <= n. Binomial
+    6: the first bound for a in [0, 1/2), the other two for a <= 1/2.
+  - Binary entropy: H is binary_entropy, -(x ln x + (1-x) ln(1-x))/ln 2,
+    equal to -lg(x^x (1-x)^(1-x)) on [0,1]; lg x is log x / log 2. All
+    bounds hold on the closed interval [0,1]; the third line holds for
+    |x| <= 1/2, and also with 1 - 4x^2 <= H(1/2 - x) <= 1 - (2/ln 2) x^2.
+  - Stirling: false as printed at n = 1, where e(n/e)^n exceeds the
+    second term and the fourth term exceeds en(n/e)^n. The whole chain
+    holds for n >= 2, the two middle links (the Robbins bounds) and
+    e(n/e)^n <= n! <= en(n/e)^n for n >= 1.
 
 Distributed with HOL Light under the same license terms.

@@ -4,7 +4,7 @@
 (* ========================================================================= *)
 
 needs "Library/permutations.ml";;
-needs "Library/agm.ml";;
+needs "Library/products.ml";;
 
 (* ------------------------------------------------------------------------- *)
 (* Cauchy-Schwarz inequality: (sum x_i y_i)^2 <= (sum x_i^2) (sum y_i^2),    *)
@@ -196,7 +196,7 @@ let KANTOROVICH_INEQUALITY = prove
   REPEAT STRIP_TAC THEN
   ASM_CASES_TAC `s:A->bool = {}` THENL
    [ASM_REWRITE_TAC[SUM_CLAUSES] THEN REAL_ARITH_TAC; ALL_TAC] THEN
-  SUBGOAL_THEN `m <= M` ASSUME_TAC THENL
+  SUBGOAL_THEN `(m:real) <= M` ASSUME_TAC THENL
    [FIRST_X_ASSUM(MP_TAC o GEN_REWRITE_RULE I [GSYM MEMBER_NOT_EMPTY]) THEN
     ASM_MESON_TAC[REAL_LE_TRANS];
     ALL_TAC] THEN
@@ -217,12 +217,13 @@ let KANTOROVICH_INEQUALITY = prove
       CONV_TAC REAL_FIELD;
       ALL_TAC] THEN
     REWRITE_TAC[REAL_ARITH
-     `(r * y - m * y) * (M * y - r * y) = y pow 2 * ((r - m) * (M - r))`] THEN
+     `((r:real) * y - m * y) * (M * y - r * y) =
+      y pow 2 * ((r - m) * (M - r))`] THEN
     MATCH_MP_TAC REAL_LE_MUL THEN REWRITE_TAC[REAL_LE_POW_2] THEN
     MATCH_MP_TAC REAL_LE_MUL THEN ASM_REAL_ARITH_TAC;
     ALL_TAC] THEN
   REWRITE_TAC[REAL_ARITH
-   `(x - m * y) * (M * y - x) =
+   `((x:real) - m * y) * (M * y - x) =
     (m + M) * (x * y) - x pow 2 - (m * M) * y pow 2`] THEN
   ASM_SIMP_TAC[SUM_SUB; SUM_LMUL] THEN
   SUBGOAL_THEN
@@ -236,11 +237,11 @@ let KANTOROVICH_INEQUALITY = prove
   REPEAT STRIP_TAC THEN
   SUBGOAL_THEN `&0 < m * M` ASSUME_TAC THENL
    [MATCH_MP_TAC REAL_LT_MUL THEN ASM_REAL_ARITH_TAC; ALL_TAC] THEN
-  REWRITE_TAC[REAL_ARITH `a / b * c = (a * c) / b`] THEN
+  REWRITE_TAC[REAL_ARITH `(a:real) / b * c = (a * c) / b`] THEN
   ASM_SIMP_TAC[REAL_LE_RDIV_EQ;
                REAL_ARITH `&0 < m * M ==> &0 < &4 * m * M`] THEN
-  TRANS_TAC REAL_LE_TRANS `(X + (m * M) * Y) pow 2` THEN CONJ_TAC THENL
-   [MP_TAC(SPEC `X - (m * M) * Y` REAL_LE_POW_2) THEN REAL_ARITH_TAC;
+  TRANS_TAC REAL_LE_TRANS `((X:real) + (m * M) * Y) pow 2` THEN CONJ_TAC THENL
+   [MP_TAC(SPEC `(X:real) - (m * M) * Y` REAL_LE_POW_2) THEN REAL_ARITH_TAC;
     REWRITE_TAC[GSYM REAL_POW_MUL] THEN MATCH_MP_TAC REAL_POW_LE2 THEN
     ASM_SIMP_TAC[REAL_LE_ADD; REAL_LE_MUL; REAL_LT_IMP_LE] THEN
     ASM_REAL_ARITH_TAC]);;
@@ -433,7 +434,7 @@ let SUM_SIMILARLY_ORDERED_LE = prove
     DISCH_TAC THEN REWRITE_TAC[] THEN ASM_SIMP_TAC[REAL_LE_MUL];
     ALL_TAC] THEN
   REWRITE_TAC[REAL_ARITH
-   `p * q * (f - f') * (g - g') =
+   `(p:real) * q * (f - f') * (g - g') =
     (p * f * g) * q - (p * f) * (q * g') - (p * g) * (q * f') +
     p * (q * f' * g')`] THEN
   ASM_SIMP_TAC[SUM_ADD; SUM_SUB; SUM_LMUL; SUM_RMUL] THEN
@@ -455,7 +456,8 @@ let CHEBYSHEV_SUM_INEQUALITY = prove
     STRIP_TAC THEN
     DISJ_CASES_TAC
      (SPECL [`(x:A->real) i`; `(x:A->real) j`] REAL_LE_TOTAL) THENL
-     [ONCE_REWRITE_TAC[REAL_ARITH `(a - b) * (c - d) = (b - a) * (d - c)`];
+     [ONCE_REWRITE_TAC[REAL_ARITH
+       `((a:real) - b) * (c - d) = (b - a) * (d - c)`];
       ALL_TAC] THEN
     MATCH_MP_TAC REAL_LE_MUL THEN ASM_SIMP_TAC[REAL_SUB_LE];
     ALL_TAC] THEN
@@ -588,7 +590,8 @@ let REARRANGEMENT_SUM_GE_REVERSE = prove
       MATCH_MP_TAC PERMUTES_COMPOSE THEN
       ASM_REWRITE_TAC[PERMUTES_NUMSEG_REVERSE]];
     ALL_TAC] THEN
-  MATCH_MP_TAC(REAL_ARITH `x = --a /\ y = --c ==> x <= y ==> c <= a`) THEN
+  MATCH_MP_TAC(REAL_ARITH
+   `(x:real) = --a /\ y = --c ==> x <= y ==> c <= a`) THEN
   REWRITE_TAC[GSYM SUM_NEG] THEN CONJ_TAC THEN
   MATCH_MP_TAC SUM_EQ_NUMSEG THEN REPEAT STRIP_TAC THEN
   REWRITE_TAC[o_THM; REAL_NEG_NEG] THEN
@@ -799,7 +802,7 @@ let REARRANGEMENT_PRODUCT_LE_REVERSE = prove
       MATCH_MP_TAC PERMUTES_COMPOSE THEN
       ASM_REWRITE_TAC[PERMUTES_NUMSEG_REVERSE]];
     ALL_TAC] THEN
-  MATCH_MP_TAC(REAL_ARITH `x = a /\ y = c ==> x <= y ==> a <= c`) THEN
+  MATCH_MP_TAC(REAL_ARITH `(x:real) = a /\ y = c ==> x <= y ==> a <= c`) THEN
   CONJ_TAC THEN MATCH_MP_TAC PRODUCT_EQ_NUMSEG THEN REPEAT STRIP_TAC THEN
   REWRITE_TAC[o_THM; REAL_NEG_NEG] THEN
   SUBGOAL_THEN `1 <= (p:num->num) i /\ p i <= n` STRIP_ASSUME_TAC THENL
@@ -880,6 +883,89 @@ let PRODUCT_ABS_SUB_LE = prove
   ASM_REWRITE_TAC[REAL_ABS_POS]);;
 
 (* ------------------------------------------------------------------------- *)
+(* The AM-GM inequality over any finite index set (for s = {} both sides are *)
+(* 1), by induction on s. The step x m^n <= ((n m + x) / (n + 1))^(n + 1)    *)
+(* for m, x >= 0 is Bernoulli's inequality for (y / m)^(n + 1), y the mean.  *)
+(* ------------------------------------------------------------------------- *)
+
+let REAL_MUL_POW_LE_MEAN_POW = prove
+ (`!n m x. &0 <= m /\ &0 <= x
+           ==> x * m pow n <= ((&n * m + x) / (&n + &1)) pow (n + 1)`,
+  let bernoulli = prove
+   (`!h n. -- &1 <= h ==> &1 + &n * h <= (&1 + h) pow n`,
+    GEN_TAC THEN INDUCT_TAC THEN DISCH_TAC THEN
+    ASM_SIMP_TAC[real_pow; REAL_MUL_LZERO; REAL_ADD_RID; REAL_LE_REFL] THEN
+    TRANS_TAC REAL_LE_TRANS `(&1 + h) * (&1 + &n * h)` THEN CONJ_TAC THENL
+     [REWRITE_TAC[GSYM REAL_OF_NUM_SUC] THEN
+      MATCH_MP_TAC(REAL_ARITH
+       `&0 <= &n * h * h
+        ==> &1 + (&n + &1) * h <= (&1 + h) * (&1 + &n * h)`) THEN
+      MATCH_MP_TAC REAL_LE_MUL THEN REWRITE_TAC[REAL_POS; REAL_LE_SQUARE];
+      MATCH_MP_TAC REAL_LE_LMUL THEN ASM_SIMP_TAC[] THEN
+      ASM_REAL_ARITH_TAC]) in
+  REPEAT STRIP_TAC THEN ASM_CASES_TAC `m = &0` THENL
+   [ASM_CASES_TAC `n = 0` THEN
+    ASM_SIMP_TAC[real_pow; REAL_POW_ZERO; REAL_MUL_RZERO; REAL_MUL_LZERO;
+                 ADD_CLAUSES; REAL_ADD_LID; REAL_DIV_1; REAL_POW_1;
+                 REAL_MUL_RID; REAL_LE_REFL] THEN
+    MATCH_MP_TAC REAL_POW_LE THEN MATCH_MP_TAC REAL_LE_DIV THEN
+    ASM_REAL_ARITH_TAC;
+    ALL_TAC] THEN
+  SUBGOAL_THEN `&0 < m` ASSUME_TAC THENL [ASM_REAL_ARITH_TAC; ALL_TAC] THEN
+  ABBREV_TAC `y = (&n * m + x) / (&n + &1)` THEN
+  SUBGOAL_THEN `(&n + &1) * y = &n * m + x` ASSUME_TAC THENL
+   [EXPAND_TAC "y" THEN MATCH_MP_TAC REAL_DIV_LMUL THEN REAL_ARITH_TAC;
+    ALL_TAC] THEN
+  SUBGOAL_THEN `&0 <= y` ASSUME_TAC THENL
+   [EXPAND_TAC "y" THEN MATCH_MP_TAC REAL_LE_DIV THEN
+    ASM_SIMP_TAC[REAL_LE_ADD; REAL_LE_MUL; REAL_POS];
+    ALL_TAC] THEN
+  MP_TAC(SPECL [`y / m - &1`; `n + 1`] bernoulli) THEN
+  REWRITE_TAC[REAL_ARITH `&1 + (y / m - &1) = y / m`; REAL_POW_DIV;
+              GSYM REAL_OF_NUM_ADD] THEN
+  ANTS_TAC THENL
+   [REWRITE_TAC[REAL_ARITH `-- &1 <= a - &1 <=> &0 <= a`] THEN
+    ASM_SIMP_TAC[REAL_LE_DIV; REAL_LT_IMP_LE];
+    ALL_TAC] THEN
+  SUBGOAL_THEN `&1 + (&n + &1) * (y / m - &1) = x / m` SUBST1_TAC THENL
+   [UNDISCH_TAC `(&n + &1) * y = &n * m + x` THEN UNDISCH_TAC `&0 < m` THEN
+    CONV_TAC REAL_FIELD;
+    ALL_TAC] THEN
+  ASM_SIMP_TAC[REAL_LE_RDIV_EQ; REAL_POW_LT] THEN
+  MATCH_MP_TAC(REAL_ARITH `(a:real) = b ==> a <= c ==> b <= c`) THEN
+  REWRITE_TAC[GSYM ADD1; real_pow] THEN UNDISCH_TAC `&0 < m` THEN
+  CONV_TAC REAL_FIELD);;
+
+let AGM_FINITE = prove
+ (`!s (a:A->real).
+     FINITE s /\ (!i. i IN s ==> &0 <= a i)
+     ==> product s a <= (sum s a / &(CARD s)) pow (CARD s)`,
+  GEN_REWRITE_TAC I [SWAP_FORALL_THM] THEN GEN_TAC THEN
+  REWRITE_TAC[IMP_CONJ] THEN MATCH_MP_TAC FINITE_INDUCT_STRONG THEN
+  CONJ_TAC THENL
+   [REWRITE_TAC[PRODUCT_CLAUSES; CARD_CLAUSES; real_pow; REAL_LE_REFL];
+    ALL_TAC] THEN
+  SIMP_TAC[PRODUCT_CLAUSES; SUM_CLAUSES; CARD_CLAUSES; FORALL_IN_INSERT] THEN
+  MAP_EVERY X_GEN_TAC [`x:A`; `s:A->bool`] THEN STRIP_TAC THEN STRIP_TAC THEN
+  TRANS_TAC REAL_LE_TRANS
+   `(a:A->real) x * (sum s a / &(CARD(s:A->bool))) pow CARD s` THEN
+  CONJ_TAC THENL
+   [MATCH_MP_TAC REAL_LE_LMUL THEN ASM_SIMP_TAC[]; ALL_TAC] THEN
+  SUBGOAL_THEN `&(CARD(s:A->bool)) * sum s a / &(CARD s) = sum s (a:A->real)`
+  MP_TAC THENL
+   [ASM_CASES_TAC `CARD(s:A->bool) = 0` THENL
+     [SUBGOAL_THEN `s:A->bool = {}` SUBST_ALL_TAC THENL
+       [ASM_MESON_TAC[CARD_EQ_0];
+        REWRITE_TAC[SUM_CLAUSES; CARD_CLAUSES; REAL_MUL_LZERO]];
+      MATCH_MP_TAC REAL_DIV_LMUL THEN ASM_REWRITE_TAC[REAL_OF_NUM_EQ]];
+    ALL_TAC] THEN
+  MP_TAC(ISPECL [`CARD(s:A->bool)`; `sum s (a:A->real) / &(CARD(s:A->bool))`;
+                 `(a:A->real) x`] REAL_MUL_POW_LE_MEAN_POW) THEN
+  ASM_SIMP_TAC[REAL_LE_DIV; SUM_POS_LE; REAL_POS] THEN
+  DISCH_THEN(fun th -> DISCH_THEN(fun eq -> MP_TAC(REWRITE_RULE[eq] th))) THEN
+  REWRITE_TAC[ADD1; GSYM REAL_OF_NUM_ADD; REAL_ADD_AC]);;
+
+(* ------------------------------------------------------------------------- *)
 (* For a_i > 0 with prod a_i >= 1 and t > 0, prod (t + a_i) >= (t + 1)^n.    *)
 (* With u the mean of t / (t + a_i), the AM-GM inequality for t / (t + a_i)  *)
 (* and for a_i / (t + a_i), whose means are u and 1 - u, gives the two       *)
@@ -896,7 +982,7 @@ let SUM_PRODUCT_2_LEMMA = prove
    [MATCH_MP_TAC REAL_POW_LE2_REV THEN EXISTS_TAC `n:num` THEN
     ASM_SIMP_TAC[REAL_LE_MUL; REAL_POW_MUL;
                  REAL_ARITH `&0 < t ==> &0 <= t + &1`] THEN
-    TRANS_TAC REAL_LE_TRANS `q * u pow n` THEN ASM_REWRITE_TAC[] THEN
+    TRANS_TAC REAL_LE_TRANS `(q:real) * u pow n` THEN ASM_REWRITE_TAC[] THEN
     MATCH_MP_TAC REAL_LE_RMUL THEN ASM_SIMP_TAC[REAL_POW_LE; REAL_LT_IMP_LE];
     ALL_TAC] THEN
   ASM_CASES_TAC `u = &1` THENL
@@ -962,11 +1048,13 @@ let PRODUCT_ADD_POW_LE = prove
       ASM_SIMP_TAC[REAL_LE_LDIV_EQ; REAL_MUL_LID; REAL_LE_ADDR;
                    REAL_LT_IMP_LE];
       REWRITE_TAC[SUM_CONST_NUMSEG; ADD_SUB; REAL_MUL_RID; REAL_LE_REFL]];
-    MP_TAC(ISPECL [`n:num`; `\i. t / (t + (a:num->real) i)`] AGM) THEN
+    MP_TAC(ISPECL [`1..n`; `\i. t / (t + (a:num->real) i)`] AGM_FINITE) THEN
+    REWRITE_TAC[FINITE_NUMSEG; IN_NUMSEG; CARD_NUMSEG_1] THEN
     ASM_SIMP_TAC[REAL_LE_DIV; REAL_LT_IMP_LE; PRODUCT_DIV_NUMSEG;
                  PRODUCT_CONST_NUMSEG; ADD_SUB; REAL_LE_LDIV_EQ] THEN
     REWRITE_TAC[REAL_MUL_AC];
-    MP_TAC(ISPECL [`n:num`; `\i. (a:num->real) i / (t + a i)`] AGM) THEN
+    MP_TAC(ISPECL [`1..n`; `\i. (a:num->real) i / (t + a i)`] AGM_FINITE) THEN
+    REWRITE_TAC[FINITE_NUMSEG; IN_NUMSEG; CARD_NUMSEG_1] THEN
     ASM_SIMP_TAC[REAL_LE_DIV; REAL_LT_IMP_LE; PRODUCT_DIV_NUMSEG;
                  REAL_LE_LDIV_EQ] THEN
     REWRITE_TAC[REAL_MUL_AC]]);;
@@ -988,7 +1076,8 @@ let SUM_RATIO_PERMUTE_GE = prove
     REWRITE_TAC[GSYM IN_NUMSEG] THEN
     ASM_MESON_TAC[PERMUTES_IN_IMAGE; IN_NUMSEG];
     ALL_TAC] THEN
-  MP_TAC(ISPECL [`n:num`; `\i. (a:num->real) i / a(p i)`] AGM) THEN
+  MP_TAC(ISPECL [`1..n`; `\i. (a:num->real) i / a(p i)`] AGM_FINITE) THEN
+  REWRITE_TAC[FINITE_NUMSEG; IN_NUMSEG; CARD_NUMSEG_1] THEN
   ANTS_TAC THENL
    [ASM_SIMP_TAC[REAL_LE_DIV; REAL_LT_IMP_LE] THEN ASM_ARITH_TAC;
     ALL_TAC] THEN
@@ -1035,7 +1124,7 @@ let CYCLIC_RATIO_SUM_3_GE = prove
               FORALL_AND_THM; FORALL_UNWIND_THM2] THEN
   SIMP_TAC[SUM_CLAUSES_RIGHT; SUM_SING_NUMSEG; ARITH] THEN
   REWRITE_TAC[SUM_CLAUSES_NUMSEG; ARITH; REAL_ADD_LID;
-              REAL_ARITH `((a + b) + c) - a = b + c /\
+              REAL_ARITH `(((a:real) + b) + c) - a = b + c /\
                           ((a + b) + c) - b = c + a /\
                           ((a + b) + c) - c = a + b`] THEN
   CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
@@ -1069,13 +1158,14 @@ let CYCLIC_RATIO_SUM_4_GE = prove
   CONV_TAC NUM_REDUCE_CONV THEN REWRITE_TAC[] THEN
   ASM_SIMP_TAC[REAL_FIELD `&0 < x ==> x pow 2 / (x * y) = x / y`] THEN
   ABBREV_TAC
-   `t = x 1 / (x 2 + x 3) + x 2 / (x 3 + x 4) +
+   `t = (x:num->real) 1 / (x 2 + x 3) + x 2 / (x 3 + x 4) +
         x 3 / (x 4 + x 1) + x 4 / (x 1 + x 2)` THEN
   DISCH_TAC THEN MATCH_MP_TAC REAL_LE_LCANCEL_IMP THEN
-  EXISTS_TAC `x 1 * (x 2 + x 3) + x 2 * (x 3 + x 4) +
+  EXISTS_TAC `(x:num->real) 1 * (x 2 + x 3) + x 2 * (x 3 + x 4) +
               x 3 * (x 4 + x 1) + x 4 * (x 1 + x 2)` THEN
   CONJ_TAC THENL
    [REPEAT(MATCH_MP_TAC REAL_LT_ADD THEN CONJ_TAC) THEN
     MATCH_MP_TAC REAL_LT_MUL THEN ASM_SIMP_TAC[REAL_LT_ADD];
-    MP_TAC(SPEC `x 1 - x 3` REAL_LE_POW_2) THEN
-    MP_TAC(SPEC `x 2 - x 4` REAL_LE_POW_2) THEN ASM_REAL_ARITH_TAC]);;
+    MP_TAC(SPEC `(x:num->real) 1 - x 3` REAL_LE_POW_2) THEN
+    MP_TAC(SPEC `(x:num->real) 2 - x 4` REAL_LE_POW_2) THEN
+    ASM_REAL_ARITH_TAC]);;

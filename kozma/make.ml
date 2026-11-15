@@ -1,0 +1,10 @@
+(* ========================================================================= *)
+(* L. Kozma, "Useful Inequalities" (v0.44): all files, in dependency order.  *)
+(* ========================================================================= *)
+
+needs "kozma/finite_sums.ml";;       (* Finite sums and products           *)
+needs "kozma/combinatorics.ml";;     (* Set systems, prefix-free codes     *)
+needs "kozma/bernoulli_exp.ml";;     (* Bernoulli, exponential             *)
+needs "kozma/log_trig_sqrt.ml";;     (* Logarithm, trig, hyperbolic, sqrt  *)
+needs "kozma/means.ml";;             (* Means and weighted products        *)
+needs "kozma/binomial_entropy.ml";;  (* Binomials, Stirling, entropy       *)

@@ -4,7 +4,7 @@
 (* ========================================================================= *)
 
 needs "Library/binomial.ml";;
-needs "Library/agm.ml";;
+needs "kozma/finite_sums.ml";;
 
 (* ------------------------------------------------------------------------- *)
 (* A family of subsets of a INSERT t splits into the members avoiding a and  *)
@@ -722,28 +722,6 @@ let SAUER_SHELAH_INEQUALITY = prove
 (* A = {}, t = 0 with a nonempty family, where 0^0 = 1 > 0.                  *)
 (* ------------------------------------------------------------------------- *)
 
-(* ------------------------------------------------------------------------- *)
-(* The AM-GM inequality over any nonempty finite index set.                  *)
-(* ------------------------------------------------------------------------- *)
-
-let AGM_FINITE = prove
- (`!s (a:A->real).
-     FINITE s /\ ~(s = {}) /\ (!i. i IN s ==> &0 <= a i)
-     ==> product s a <= (sum s a / &(CARD s)) pow (CARD s)`,
-  REPEAT STRIP_TAC THEN
-  FIRST_ASSUM(MP_TAC o GEN_REWRITE_RULE I [FINITE_INDEX_NUMSEG]) THEN
-  SUBGOAL_THEN `1 <= CARD(s:A->bool)` MP_TAC THENL
-   [ASM_SIMP_TAC[ARITH_RULE `1 <= n <=> ~(n = 0)`; CARD_EQ_0]; ALL_TAC] THEN
-  SPEC_TAC(`CARD(s:A->bool)`,`n:num`) THEN GEN_TAC THEN DISCH_TAC THEN
-  DISCH_THEN(X_CHOOSE_THEN `f:num->A` STRIP_ASSUME_TAC) THEN
-  FIRST_X_ASSUM SUBST_ALL_TAC THEN
-  MP_TAC(ISPECL [`f:num->A`; `a:A->real`; `1..n`] PRODUCT_IMAGE) THEN
-  MP_TAC(ISPECL [`f:num->A`; `a:A->real`; `1..n`] SUM_IMAGE) THEN
-  ASM_REWRITE_TAC[] THEN REPEAT(DISCH_THEN SUBST1_TAC) THEN
-  MATCH_MP_TAC AGM THEN ASM_REWRITE_TAC[o_THM] THEN
-  REPEAT STRIP_TAC THEN FIRST_X_ASSUM MATCH_MP_TAC THEN
-  REWRITE_TAC[IN_IMAGE; IN_NUMSEG] THEN ASM_MESON_TAC[]);;
-
 let SHEARER_STEP_POW = prove
  (`!x y r s w t.
      1 <= t /\ &0 <= x /\ &0 <= y /\ &0 <= r /\ &0 <= s /\ r + s <= &1 /\
@@ -754,14 +732,14 @@ let SHEARER_STEP_POW = prove
    `!z u. &0 <= z /\ &0 <= u /\ u <= &1 /\ z pow t <= w * u pow t
           ==> z pow t <= w`
   (LABEL_TAC "h1") THENL
-   [REPEAT STRIP_TAC THEN TRANS_TAC REAL_LE_TRANS `w * u pow t` THEN
+   [REPEAT STRIP_TAC THEN TRANS_TAC REAL_LE_TRANS `(w:real) * u pow t` THEN
     ASM_REWRITE_TAC[] THEN GEN_REWRITE_TAC RAND_CONV [GSYM REAL_MUL_RID] THEN
     MATCH_MP_TAC REAL_LE_LMUL THEN ASM_SIMP_TAC[REAL_POW_1_LE];
     ALL_TAC] THEN
   SUBGOAL_THEN
    `!z u. &0 <= z /\ u = &0 /\ z pow t <= w * u pow t ==> z = &0`
   (LABEL_TAC "h2") THENL
-   [REPEAT STRIP_TAC THEN UNDISCH_TAC `z pow t <= w * u pow t` THEN
+   [REPEAT STRIP_TAC THEN UNDISCH_TAC `(z:real) pow t <= w * u pow t` THEN
     ASM_REWRITE_TAC[REAL_POW_ZERO] THEN
     COND_CASES_TAC THENL [ASM_ARITH_TAC; ALL_TAC] THEN
     REWRITE_TAC[REAL_MUL_RZERO] THEN DISCH_TAC THEN
@@ -788,20 +766,21 @@ let SHEARER_STEP_POW = prove
     ALL_TAC] THEN
   SUBGOAL_THEN `&0 < r /\ &0 < s` STRIP_ASSUME_TAC THENL
    [ASM_REAL_ARITH_TAC; ALL_TAC] THEN
-  SUBGOAL_THEN `(x / r) pow t <= w /\ (y / s) pow t <= w` STRIP_ASSUME_TAC
-  THENL
+  SUBGOAL_THEN `((x:real) / r) pow t <= w /\ ((y:real) / s) pow t <= w`
+  STRIP_ASSUME_TAC THENL
    [ASM_SIMP_TAC[REAL_POW_DIV; REAL_LE_LDIV_EQ; REAL_POW_LT]; ALL_TAC] THEN
-  SUBGOAL_THEN `x = r * x / r /\ y = s * y / s` MP_TAC THENL
+  SUBGOAL_THEN `(x:real) = r * x / r /\ (y:real) = s * y / s` MP_TAC THENL
    [ASM_SIMP_TAC[REAL_DIV_LMUL; REAL_LT_IMP_NZ]; ALL_TAC] THEN
   SUBGOAL_THEN `&0 <= x / r /\ &0 <= y / s` MP_TAC THENL
    [ASM_SIMP_TAC[REAL_LE_DIV; REAL_LT_IMP_LE]; ALL_TAC] THEN
-  UNDISCH_TAC `(x / r) pow t <= w` THEN UNDISCH_TAC `(y / s) pow t <= w` THEN
-  SPEC_TAC(`x / r`,`a:real`) THEN SPEC_TAC(`y / s`,`b:real`) THEN
+  UNDISCH_TAC `((x:real) / r) pow t <= w` THEN
+  UNDISCH_TAC `((y:real) / s) pow t <= w` THEN
+  SPEC_TAC(`(x:real) / r`,`a:real`) THEN SPEC_TAC(`(y:real) / s`,`b:real`) THEN
   REPEAT GEN_TAC THEN REPEAT DISCH_TAC THEN
   FIRST_X_ASSUM(CONJUNCTS_THEN SUBST1_TAC) THEN
-  DISJ_CASES_TAC(REAL_ARITH `a <= b \/ b <= a`) THENL
-   [TRANS_TAC REAL_LE_TRANS `b pow t`;
-    TRANS_TAC REAL_LE_TRANS `a pow t`] THEN
+  DISJ_CASES_TAC(REAL_ARITH `(a:real) <= b \/ b <= a`) THENL
+   [TRANS_TAC REAL_LE_TRANS `(b:real) pow t`;
+    TRANS_TAC REAL_LE_TRANS `(a:real) pow t`] THEN
   ASM_REWRITE_TAC[] THEN MATCH_MP_TAC REAL_POW_LE2 THEN
   (CONJ_TAC THENL
     [MATCH_MP_TAC REAL_LE_ADD THEN CONJ_TAC THEN
@@ -834,7 +813,7 @@ let SHEARER_STEP_PRODUCT = prove
     SUBGOAL_THEN `(g:B) IN C` ASSUME_TAC THENL [ASM_SIMP_TAC[]; ALL_TAC] THEN
     SUBGOAL_THEN `(p:B->real) g = &0 /\ (q:B->real) g = &0`
     STRIP_ASSUME_TAC THENL
-     [UNDISCH_TAC `!f:B. f IN M ==> p f + q f <= c f` THEN
+     [UNDISCH_TAC `!f:B. f IN M ==> (p:B->real) f + q f <= c f` THEN
       DISCH_THEN(MP_TAC o SPEC `g:B`) THEN
       UNDISCH_TAC
        `!f:B. f IN C
@@ -905,10 +884,7 @@ let SHEARER_STEP_PRODUCT = prove
     TRANS_TAC REAL_LE_TRANS
      `(sum M (\f:B. h f / c f) / &(CARD(M:B->bool))) pow (CARD M)` THEN
     CONJ_TAC THENL
-     [MATCH_MP_TAC AGM_FINITE THEN ASM_SIMP_TAC[] THEN DISCH_TAC THEN
-      UNDISCH_TAC `t <= CARD(M:B->bool)` THEN
-      ASM_REWRITE_TAC[CARD_CLAUSES] THEN ASM_ARITH_TAC;
-      ALL_TAC] THEN
+     [MATCH_MP_TAC AGM_FINITE THEN ASM_SIMP_TAC[]; ALL_TAC] THEN
     MATCH_MP_TAC REAL_POW_MONO_INV THEN
     ASM_SIMP_TAC[REAL_LE_DIV; REAL_POS; SUM_POS_LE; REAL_LE_LDIV_EQ;
                  REAL_MUL_LID] THEN
@@ -936,12 +912,13 @@ let SHEARER_STEP_PRODUCT = prove
      [MATCH_MP_TAC SUM_LE THEN ASM_REWRITE_TAC[] THEN
       X_GEN_TAC `f:B` THEN DISCH_TAC THEN
       MP_TAC(SPEC `f:B` (ASSUME `!f:B. f IN M ==> &0 < c f`)) THEN
-      MP_TAC(SPEC `f:B` (ASSUME `!f:B. f IN M ==> p f + q f <= c f`)) THEN
+      MP_TAC(SPEC `f:B`
+        (ASSUME `!f:B. f IN M ==> (p:B->real) f + q f <= c f`)) THEN
       REWRITE_TAC[ASSUME `(f:B) IN M`] THEN DISCH_TAC THEN DISCH_TAC THEN
       REWRITE_TAC[real_div; GSYM REAL_ADD_RDISTRIB] THEN
       REWRITE_TAC[GSYM real_div] THEN
       SIMP_TAC[REAL_LE_LDIV_EQ; ASSUME `&0 < c(f:B)`; REAL_MUL_LID;
-               ASSUME `p (f:B) + q f <= c f`];
+               ASSUME `(p:B->real) (f:B) + q f <= c f`];
       ASM_SIMP_TAC[SUM_CONST; REAL_MUL_RID; REAL_LE_REFL]];
     USE_THEN "sub" (MATCH_MP_TAC o SPEC `p:B->real`) THEN ASM_SIMP_TAC[];
     USE_THEN "sub" (MATCH_MP_TAC o SPEC `q:B->real`) THEN ASM_SIMP_TAC[]]);;

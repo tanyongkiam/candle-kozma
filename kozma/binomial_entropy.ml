@@ -163,9 +163,16 @@ let BINOM_POWER_INEQUALITY = prove
 (* <= C(tn,k), from m^k C(n,k) <= n^k C(m,k) for n <= m.                     *)
 (* ------------------------------------------------------------------------- *)
 
-let BINOM_LE_SUC = prove
- (`!n k. binom(n,k) <= binom(SUC n,k)`,
-  GEN_TAC THEN INDUCT_TAC THEN REWRITE_TAC[binom; LE_REFL] THEN ARITH_TAC);;
+let BINOM_MONO = prove
+ (`!m n k. m <= n ==> binom(m,k) <= binom(n,k)`,
+  SUBGOAL_THEN `!n k. binom(n,k) <= binom(SUC n,k)` ASSUME_TAC THENL
+   [GEN_TAC THEN INDUCT_TAC THEN REWRITE_TAC[binom; LE_REFL] THEN ARITH_TAC;
+    ALL_TAC] THEN
+  REPEAT GEN_TAC THEN GEN_REWRITE_TAC LAND_CONV [LE_EXISTS] THEN
+  DISCH_THEN(X_CHOOSE_THEN `d:num` SUBST1_TAC) THEN
+  SPEC_TAC(`d:num`,`d:num`) THEN INDUCT_TAC THEN
+  REWRITE_TAC[ADD_CLAUSES; LE_REFL] THEN
+  TRANS_TAC LE_TRANS `binom(m + d,k)` THEN ASM_REWRITE_TAC[]);;
 
 let BINOM_PRODUCT_INEQUALITY = prove
  (`!n1 n2 k1 k2. binom(n1,k1) * binom(n2,k2) <= binom(n1 + n2,k1 + k2)`,
@@ -176,7 +183,8 @@ let BINOM_PRODUCT_INEQUALITY = prove
   REPEAT GEN_TAC THEN
   STRUCT_CASES_TAC(SPEC `k2:num` num_CASES) THENL
    [REWRITE_TAC[binom; MULT_CLAUSES; ADD_CLAUSES] THEN
-    TRANS_TAC LE_TRANS `binom(n1 + n2,k1)` THEN REWRITE_TAC[BINOM_LE_SUC] THEN
+    TRANS_TAC LE_TRANS `binom(n1 + n2,k1)` THEN
+    SIMP_TAC[BINOM_MONO; ARITH_RULE `n1 + n2 <= SUC(n1 + n2)`] THEN
     FIRST_X_ASSUM(MP_TAC o SPECL [`k1:num`; `0`]) THEN
     REWRITE_TAC[binom; MULT_CLAUSES; ADD_CLAUSES];
     REWRITE_TAC[ADD_CLAUSES; binom; LEFT_ADD_DISTRIB] THEN
@@ -635,10 +643,13 @@ let WALLIS_FACT_BOUNDS = prove
   ASM_REAL_ARITH_TAC);;
 
 (* ------------------------------------------------------------------------- *)
-(* Stirling: with d(n) = ln n! - ((n+1/2) ln n - n), d(n) - 1/(12n)          *)
-(* increases and d(n) - 1/(12n+1) decreases; the Wallis bounds give their    *)
-(* common limit ln(2 pi)/2. Hence the Robbins bounds for n >= 1. The outer   *)
-(* links to e(n/e)^n and en(n/e)^n hold for n >= 2 and fail at n = 1.        *)
+(* Stirling: with the remainder                                              *)
+(* r(n) = ln n! - ((n+1/2) ln n - n) - ln(2 pi)/2 (stirling_remainder), so   *)
+(* that n! = sqrt(2 pi n) (n/e)^n e^r(n),                                    *)
+(* r(n) - 1/(12n) increases and r(n) - 1/(12n+1) decreases; the Wallis       *)
+(* bounds give their common limit 0. Hence the Robbins bounds                *)
+(* 1/(12n+1) <= r(n) <= 1/(12n) for n >= 1. The outer links to e(n/e)^n and  *)
+(* en(n/e)^n hold for n >= 2 and fail at n = 1.                              *)
 (* ------------------------------------------------------------------------- *)
 
 let STIRLING_STEP_BOUNDS = prove
@@ -695,13 +706,15 @@ let STIRLING_STEP_BOUNDS = prove
        [UNDISCH_TAC `&1 <= x` THEN CONV_TAC REAL_FIELD; ALL_TAC] THEN
       UNDISCH_TAC `&1 <= x` THEN CONV_TAC REAL_FIELD]]);;
 
+let stirling_remainder = new_definition
+ `stirling_remainder n =
+    log(&(FACT n)) - ((&n + &1 / &2) * log(&n) - &n) - log(&2 * pi) / &2`;;
+
 let STIRLING_REMAINDER_STEP = prove
  (`!n. 1 <= n
-       ==> (log(&(FACT n)) - ((&n + &1 / &2) * log(&n) - &n)) -
-           (log(&(FACT(n + 1))) -
-            ((&(n + 1) + &1 / &2) * log(&(n + 1)) - &(n + 1)))
-           = (&n + &1 / &2) * log(&(n + 1) / &n) - &1`,
-  REPEAT STRIP_TAC THEN
+       ==> stirling_remainder n - stirling_remainder(n + 1) =
+           (&n + &1 / &2) * log(&(n + 1) / &n) - &1`,
+  REPEAT STRIP_TAC THEN REWRITE_TAC[stirling_remainder] THEN
   REWRITE_TAC[GSYM ADD1; FACT; GSYM REAL_OF_NUM_MUL] THEN
   SUBGOAL_THEN `&0 < &n /\ &0 < &(SUC n) /\ &0 < &(FACT n)`
   STRIP_ASSUME_TAC THENL
@@ -710,12 +723,12 @@ let STIRLING_REMAINDER_STEP = prove
   REWRITE_TAC[GSYM REAL_OF_NUM_SUC] THEN REAL_ARITH_TAC);;
 
 let STIRLING_REMAINDER_STEP_MONO = prove
- (`!d k. (!n. d n = log(&(FACT n)) - ((&n + &1 / &2) * log(&n) - &n)) /\
-         1 <= k
-         ==> d k - &1 / (&12 * &k) <= d(k + 1) - &1 / (&12 * &(k + 1)) /\
-             d(k + 1) - &1 / (&12 * &(k + 1) + &1)
-               <= d k - &1 / (&12 * &k + &1)`,
-  REPEAT GEN_TAC THEN STRIP_TAC THEN
+ (`!k. 1 <= k
+       ==> stirling_remainder k - &1 / (&12 * &k) <=
+           stirling_remainder(k + 1) - &1 / (&12 * &(k + 1)) /\
+           stirling_remainder(k + 1) - &1 / (&12 * &(k + 1) + &1) <=
+           stirling_remainder k - &1 / (&12 * &k + &1)`,
+  GEN_TAC THEN DISCH_TAC THEN
   MP_TAC(SPEC `k:num` STIRLING_REMAINDER_STEP) THEN
   MP_TAC(SPEC `&k` STIRLING_STEP_BOUNDS) THEN
   ASM_REWRITE_TAC[REAL_OF_NUM_LE] THEN
@@ -726,28 +739,27 @@ let STIRLING_REMAINDER_STEP_MONO = prove
   REAL_ARITH_TAC);;
 
 let STIRLING_REMAINDER_MONO = prove
- (`!d m n.
-     (!n. d n = log(&(FACT n)) - ((&n + &1 / &2) * log(&n) - &n)) /\
-     1 <= n /\ n <= m
-     ==> d n - &1 / (&12 * &n) <= d m - &1 / (&12 * &m) /\
-         d m - &1 / (&12 * &m + &1) <= d n - &1 / (&12 * &n + &1)`,
+ (`!m n. 1 <= n /\ n <= m
+         ==> stirling_remainder n - &1 / (&12 * &n) <=
+             stirling_remainder m - &1 / (&12 * &m) /\
+             stirling_remainder m - &1 / (&12 * &m + &1) <=
+             stirling_remainder n - &1 / (&12 * &n + &1)`,
   REPEAT GEN_TAC THEN STRIP_TAC THEN
   UNDISCH_TAC `n:num <= m` THEN REWRITE_TAC[LE_EXISTS] THEN
   DISCH_THEN(X_CHOOSE_THEN `p:num` SUBST1_TAC) THEN
   SPEC_TAC(`p:num`, `p:num`) THEN
   INDUCT_TAC THEN REWRITE_TAC[ADD_CLAUSES; REAL_LE_REFL] THEN
-  MP_TAC(SPECL [`d:num->real`; `n + p:num`] STIRLING_REMAINDER_STEP_MONO) THEN
-  ANTS_TAC THENL [ASM_REWRITE_TAC[] THEN ASM_ARITH_TAC; ALL_TAC] THEN
+  MP_TAC(SPEC `n + p:num` STIRLING_REMAINDER_STEP_MONO) THEN
+  ANTS_TAC THENL [ASM_ARITH_TAC; ALL_TAC] THEN
   REWRITE_TAC[ADD1] THEN POP_ASSUM MP_TAC THEN REAL_ARITH_TAC);;
 
 let LOG_WALLIS_QUOTIENT = prove
- (`!d m. (!n. d n = log(&(FACT n)) - ((&n + &1 / &2) * log(&n) - &n)) /\
-         1 <= m
-         ==> log(&16 pow m * &(FACT m) pow 4 /
-                 (&(FACT(2 * m)) * &(FACT(2 * m + 1)))) =
-             &4 * d m - &2 * d(2 * m) + log(&m) - log(&2) -
-             log(&2 * &m + &1)`,
-  REPEAT STRIP_TAC THEN ASM_REWRITE_TAC[] THEN
+ (`!m. 1 <= m
+       ==> log(&16 pow m * &(FACT m) pow 4 /
+               (&(FACT(2 * m)) * &(FACT(2 * m + 1)))) =
+           &4 * stirling_remainder m - &2 * stirling_remainder(2 * m) +
+           log(&2 * pi) + log(&m) - log(&2) - log(&2 * &m + &1)`,
+  REPEAT STRIP_TAC THEN REWRITE_TAC[stirling_remainder] THEN
   REWRITE_TAC[GSYM ADD1; FACT; GSYM REAL_OF_NUM_MUL] THEN
   REWRITE_TAC[ADD1; GSYM REAL_OF_NUM_ADD; GSYM REAL_OF_NUM_MUL] THEN
   SUBGOAL_THEN `&0 < &m /\ &0 < &(FACT m) /\ &0 < &(FACT(2 * m))`
@@ -772,17 +784,18 @@ let LOG_WALLIS_QUOTIENT = prove
   REWRITE_TAC[GSYM REAL_OF_NUM_MUL] THEN REAL_ARITH_TAC);;
 
 let STIRLING_REMAINDER_WALLIS = prove
- (`!d m. (!n. d n = log(&(FACT n)) - ((&n + &1 / &2) * log(&n) - &n)) /\
-         1 <= m
-         ==> log(&2 * pi) <= &4 * d m - &2 * d(2 * m) /\
-             &4 * d m - &2 * d(2 * m) <= log(&2 * pi) + &1 / (&2 * &m)`,
-  REPEAT GEN_TAC THEN DISCH_THEN STRIP_ASSUME_TAC THEN
-  MP_TAC(SPECL [`d:num->real`; `m:num`] LOG_WALLIS_QUOTIENT) THEN
-  ANTS_TAC THENL [ASM_REWRITE_TAC[]; ALL_TAC] THEN
+ (`!m. 1 <= m
+       ==> &0 <=
+           &4 * stirling_remainder m - &2 * stirling_remainder(2 * m) /\
+           &4 * stirling_remainder m - &2 * stirling_remainder(2 * m) <=
+           &1 / (&2 * &m)`,
+  GEN_TAC THEN DISCH_TAC THEN
+  MP_TAC(SPEC `m:num` LOG_WALLIS_QUOTIENT) THEN ASM_REWRITE_TAC[] THEN
   MP_TAC(SPEC `m:num` WALLIS_FACT_BOUNDS) THEN
   SPEC_TAC(`&16 pow m * &(FACT m) pow 4 /
             (&(FACT(2 * m)) * &(FACT(2 * m + 1)))`, `q:real`) THEN
-  SPEC_TAC(`&4 * d m - &2 * d(2 * m)`, `y:real`) THEN
+  SPEC_TAC(`&4 * stirling_remainder m - &2 * stirling_remainder(2 * m)`,
+           `y:real`) THEN
   SUBGOAL_THEN `&1 <= &m` MP_TAC THENL
    [ASM_REWRITE_TAC[REAL_OF_NUM_LE]; ALL_TAC] THEN
   SPEC_TAC(`&m`, `x:real`) THEN
@@ -833,16 +846,15 @@ let REAL_LE_ADD_INV_EVENTUALLY = prove
     ALL_TAC] THEN
   ASM_REAL_ARITH_TAC);;
 
-let STIRLING_REMAINDER_HALF = prove
- (`!d m. (!n. d n = log(&(FACT n)) - ((&n + &1 / &2) * log(&n) - &n)) /\
-         1 <= m
-         ==> log(&2 * pi) / &2 - &1 / (&24 * &m) <= d m /\
-             d m <= log(&2 * pi) / &2 + &1 / (&4 * &m)`,
-  REPEAT GEN_TAC THEN DISCH_THEN STRIP_ASSUME_TAC THEN
-  MP_TAC(SPECL [`d:num->real`; `m:num`] STIRLING_REMAINDER_WALLIS) THEN
-  ANTS_TAC THENL [ASM_REWRITE_TAC[]; ALL_TAC] THEN
-  MP_TAC(SPECL [`d:num->real`; `2 * m`; `m:num`] STIRLING_REMAINDER_MONO) THEN
-  ANTS_TAC THENL [ASM_REWRITE_TAC[] THEN ASM_ARITH_TAC; ALL_TAC] THEN
+let STIRLING_REMAINDER_WEAK_BOUNDS = prove
+ (`!m. 1 <= m
+       ==> --(&1 / (&24 * &m)) <= stirling_remainder m /\
+           stirling_remainder m <= &1 / (&4 * &m)`,
+  GEN_TAC THEN DISCH_TAC THEN
+  MP_TAC(SPEC `m:num` STIRLING_REMAINDER_WALLIS) THEN
+  ASM_REWRITE_TAC[] THEN
+  MP_TAC(SPECL [`2 * m`; `m:num`] STIRLING_REMAINDER_MONO) THEN
+  ANTS_TAC THENL [ASM_ARITH_TAC; ALL_TAC] THEN
   SUBGOAL_THEN `&0 < &m` ASSUME_TAC THENL
    [REWRITE_TAC[REAL_OF_NUM_LT] THEN ASM_ARITH_TAC; ALL_TAC] THEN
   SUBGOAL_THEN `inv(&12 * &(2 * m) + &1) <= inv(&12 * &m + &1)` MP_TAC THENL
@@ -853,19 +865,16 @@ let STIRLING_REMAINDER_HALF = prove
   REAL_ARITH_TAC);;
 
 let STIRLING_REMAINDER_BOUNDS = prove
- (`!d n. (!n. d n = log(&(FACT n)) - ((&n + &1 / &2) * log(&n) - &n)) /\
-         1 <= n
-         ==> log(&2 * pi) / &2 + &1 / (&12 * &n + &1) <= d n /\
-             d n <= log(&2 * pi) / &2 + &1 / (&12 * &n)`,
-  REPEAT GEN_TAC THEN DISCH_THEN STRIP_ASSUME_TAC THEN
-  ONCE_REWRITE_TAC[REAL_ARITH `(c:real) + e <= x <=> c <= x - e`;
-                   REAL_ARITH `(x:real) <= c + e <=> x - e <= c`] THEN
+ (`!n. 1 <= n
+       ==> &1 / (&12 * &n + &1) <= stirling_remainder n /\
+           stirling_remainder n <= &1 / (&12 * &n)`,
+  GEN_TAC THEN DISCH_TAC THEN
+  ONCE_REWRITE_TAC[REAL_ARITH `(e:real) <= x <=> &0 <= x - e`] THEN
   CONJ_TAC THEN MATCH_MP_TAC REAL_LE_ADD_INV_EVENTUALLY THEN
   EXISTS_TAC `n:num` THEN X_GEN_TAC `m:num` THEN STRIP_TAC THEN
-  (MP_TAC(SPECL [`d:num->real`; `m:num`] STIRLING_REMAINDER_HALF) THEN
+  (MP_TAC(SPEC `m:num` STIRLING_REMAINDER_WEAK_BOUNDS) THEN
    ANTS_TAC THENL [ASM_REWRITE_TAC[]; ALL_TAC] THEN
-   MP_TAC(SPECL [`d:num->real`; `m:num`; `n:num`]
-          STIRLING_REMAINDER_MONO) THEN
+   MP_TAC(SPECL [`m:num`; `n:num`] STIRLING_REMAINDER_MONO) THEN
    ANTS_TAC THENL [ASM_REWRITE_TAC[]; ALL_TAC] THEN
    SUBGOAL_THEN `&0 < &m` ASSUME_TAC THENL
     [REWRITE_TAC[REAL_OF_NUM_LT] THEN ASM_ARITH_TAC; ALL_TAC] THEN
@@ -885,9 +894,8 @@ let STIRLING_FACT_BOUNDS = prove
            &(FACT n) <=
            sqrt(&2 * pi * &n) * (&n / exp(&1)) pow n * exp(&1 / (&12 * &n))`,
   GEN_TAC THEN DISCH_TAC THEN
-  MP_TAC(SPECL [`\n. log(&(FACT n)) - ((&n + &1 / &2) * log(&n) - &n)`;
-                `n:num`] STIRLING_REMAINDER_BOUNDS) THEN
-  ASM_REWRITE_TAC[] THEN
+  MP_TAC(SPEC `n:num` STIRLING_REMAINDER_BOUNDS) THEN
+  ASM_REWRITE_TAC[stirling_remainder] THEN
   SUBGOAL_THEN `&0 < &n /\ &0 < &(FACT n) /\ &0 < pi` STRIP_ASSUME_TAC THENL
    [REWRITE_TAC[REAL_OF_NUM_LT; FACT_LT; PI_POS] THEN ASM_ARITH_TAC;
     ALL_TAC] THEN
@@ -1109,9 +1117,8 @@ let STIRLING_INEQUALITY_COUNTEREXAMPLE = prove
 (* ------------------------------------------------------------------------- *)
 
 let REAL_EXP_NEG_TAYLOR_BOUNDS = prove
- (`!x. &0 <= x
-       ==> &1 - x + x pow 2 / &2 - x pow 3 / &6 <= exp(--x) /\
-           exp(--x) <= &1 - x + x pow 2 / &2`,
+ (`!x. &1 - x + x pow 2 / &2 - x pow 3 / &6 <= exp(--x) /\
+       (&0 <= x ==> exp(--x) <= &1 - x + x pow 2 / &2)`,
   SUBGOAL_THEN `!x. &0 <= x ==> exp(--x) <= &1 - x + x pow 2 / &2`
   ASSUME_TAC THENL
    [GEN_TAC THEN DISCH_TAC THEN ONCE_REWRITE_TAC[GSYM REAL_SUB_LE] THEN
@@ -1129,7 +1136,11 @@ let REAL_EXP_NEG_TAYLOR_BOUNDS = prove
       REAL_ARITH_TAC;
       MP_TAC(SPEC `--(y:real)` REAL_EXP_LE_X) THEN REAL_ARITH_TAC];
     ALL_TAC] THEN
-  GEN_TAC THEN DISCH_TAC THEN ASM_SIMP_TAC[] THEN
+  GEN_TAC THEN ASM_SIMP_TAC[] THEN ASM_CASES_TAC `&0 <= x` THENL
+   [ALL_TAC;
+    MP_TAC(SPEC `--x:real` REAL_EXP_CUBIC_LE) THEN
+    REWRITE_TAC[REAL_POW_NEG; ARITH] THEN
+    ANTS_TAC THENL [ASM_REAL_ARITH_TAC; REAL_ARITH_TAC]] THEN
   ONCE_REWRITE_TAC[GSYM REAL_SUB_LE] THEN
   MP_TAC(ISPECL [`\x. exp(--x) - (&1 - x + x pow 2 / &2 - x pow 3 / &6)`;
                  `\x. (&1 - x + x pow 2 / &2) - exp(--x)`;
@@ -1146,12 +1157,11 @@ let REAL_EXP_NEG_TAYLOR_BOUNDS = prove
     ASM_SIMP_TAC[REAL_SUB_LE]]);;
 
 let LOG_CENTRAL_BINOM = prove
- (`!d n. (!n. d n = log(&(FACT n)) - ((&n + &1 / &2) * log(&n) - &n)) /\
-         1 <= n
-         ==> log(&(binom(2 * n,n))) =
-             log(&4 pow n / sqrt(pi * &n)) +
-             (d(2 * n) - &2 * d n + log(&2 * pi) / &2)`,
-  REPEAT GEN_TAC THEN DISCH_THEN STRIP_ASSUME_TAC THEN ASM_REWRITE_TAC[] THEN
+ (`!n. 1 <= n
+       ==> log(&(binom(2 * n,n))) =
+           log(&4 pow n / sqrt(pi * &n)) +
+           (stirling_remainder(2 * n) - &2 * stirling_remainder n)`,
+  GEN_TAC THEN DISCH_TAC THEN REWRITE_TAC[stirling_remainder] THEN
   MP_TAC(SPECL [`n:num`; `n:num`] BINOM_FACT) THEN
   REWRITE_TAC[GSYM MULT_2] THEN DISCH_THEN(SUBST1_TAC o SYM) THEN
   REWRITE_TAC[GSYM REAL_OF_NUM_MUL] THEN
@@ -1241,12 +1251,9 @@ let CENTRAL_BINOM_INEQUALITY = prove
     ALL_TAC] THEN
   SUBGOAL_THEN `&2 <= &n` ASSUME_TAC THENL
    [REWRITE_TAC[REAL_OF_NUM_LE] THEN ASM_ARITH_TAC; ALL_TAC] THEN
-  MP_TAC(SPECL [`\n. log(&(FACT n)) - ((&n + &1 / &2) * log(&n) - &n)`;
-                `n:num`] LOG_CENTRAL_BINOM) THEN
-  MP_TAC(SPECL [`\n. log(&(FACT n)) - ((&n + &1 / &2) * log(&n) - &n)`;
-                `n:num`] STIRLING_REMAINDER_BOUNDS) THEN
-  MP_TAC(SPECL [`\n. log(&(FACT n)) - ((&n + &1 / &2) * log(&n) - &n)`;
-                `2 * n`] STIRLING_REMAINDER_BOUNDS) THEN
+  MP_TAC(SPEC `n:num` LOG_CENTRAL_BINOM) THEN
+  MP_TAC(SPEC `n:num` STIRLING_REMAINDER_BOUNDS) THEN
+  MP_TAC(SPEC `2 * n` STIRLING_REMAINDER_BOUNDS) THEN
   ASM_REWRITE_TAC[] THEN ANTS_TAC THENL [ASM_ARITH_TAC; ALL_TAC] THEN
   REWRITE_TAC[GSYM REAL_OF_NUM_MUL; REAL_MUL_ASSOC] THEN
   CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
@@ -1293,11 +1300,9 @@ let CENTRAL_BINOM_INEQUALITY = prove
     TRANS_TAC REAL_LE_TRANS
      `exp(--(&1 / (&6 * &n) - &1 / (&24 * &n + &1)))` THEN
     CONJ_TAC THENL
-     [MP_TAC(SPEC `&1 / (&6 * &n) - &1 / (&24 * &n + &1)`
-                  REAL_EXP_NEG_TAYLOR_BOUNDS) THEN
-      ANTS_TAC THENL [ALL_TAC; REAL_ARITH_TAC] THEN
-      REWRITE_TAC[REAL_SUB_LE; real_div; REAL_MUL_LID] THEN
-      MATCH_MP_TAC REAL_LE_INV2 THEN ASM_REAL_ARITH_TAC;
+     [MP_TAC(CONJUNCT1(SPEC `&1 / (&6 * &n) - &1 / (&24 * &n + &1)`
+                  REAL_EXP_NEG_TAYLOR_BOUNDS)) THEN
+      REAL_ARITH_TAC;
       REWRITE_TAC[REAL_EXP_MONO_LE] THEN ASM_REAL_ARITH_TAC];
     MP_TAC(SPEC `&n` CENTRAL_BINOM_UPPER_MARGIN) THEN ASM_REWRITE_TAC[] THEN
     MATCH_MP_TAC(REAL_ARITH `(a:real) <= b ==> b <= c ==> a <= c`) THEN
@@ -1305,8 +1310,8 @@ let CENTRAL_BINOM_INEQUALITY = prove
      `exp(--(&2 / (&12 * &n + &1) - &1 / (&24 * &n)))` THEN
     CONJ_TAC THENL
      [REWRITE_TAC[REAL_EXP_MONO_LE] THEN ASM_REAL_ARITH_TAC;
-      MP_TAC(SPEC `&2 / (&12 * &n + &1) - &1 / (&24 * &n)`
-                  REAL_EXP_NEG_TAYLOR_BOUNDS) THEN
+      MP_TAC(CONJUNCT2(SPEC `&2 / (&12 * &n + &1) - &1 / (&24 * &n)`
+                  REAL_EXP_NEG_TAYLOR_BOUNDS)) THEN
       ANTS_TAC THENL [ALL_TAC; REAL_ARITH_TAC] THEN
       SUBGOAL_THEN `inv(&24 * &n) <= inv(&12 * &n + &1) /\
                     &0 <= inv(&12 * &n + &1)` MP_TAC THENL
@@ -1323,11 +1328,34 @@ let CENTRAL_BINOM_INEQUALITY = prove
 let binary_entropy = new_definition
  `binary_entropy x = --(x * log x + (&1 - x) * log(&1 - x)) / log(&2)`;;
 
+let BINARY_ENTROPY_0_1 = prove
+ (`binary_entropy(&0) = &0 /\ binary_entropy(&1) = &0`,
+  REWRITE_TAC[binary_entropy; REAL_SUB_REFL; REAL_SUB_RZERO; LOG_1] THEN
+  REAL_ARITH_TAC);;
+
 let BINARY_ENTROPY_RATIO_LOG = prove
- (`!n k a. 0 < k /\ k < n /\ &k = a * &n
+ (`!n k a. k <= n /\ &k = a * &n
            ==> &n * binary_entropy a * log(&2) =
                &n * log(&n) - &k * log(&k) - &(n - k) * log(&(n - k))`,
-  REPEAT STRIP_TAC THEN
+  REPEAT STRIP_TAC THEN ASM_CASES_TAC `0 < k /\ k < n` THENL
+   [FIRST_X_ASSUM STRIP_ASSUME_TAC;
+    ASM_CASES_TAC `n = 0` THENL
+     [SUBGOAL_THEN `k = 0` SUBST_ALL_TAC THENL [ASM_ARITH_TAC; ALL_TAC] THEN
+      UNDISCH_TAC `n = 0` THEN DISCH_THEN SUBST_ALL_TAC THEN
+      REWRITE_TAC[SUB_0; REAL_MUL_LZERO] THEN REAL_ARITH_TAC;
+      ALL_TAC] THEN
+    SUBGOAL_THEN `&0 < &n` ASSUME_TAC THENL
+     [ASM_REWRITE_TAC[REAL_OF_NUM_LT; LT_NZ]; ALL_TAC] THEN
+    SUBGOAL_THEN `k = 0 \/ k = n` (DISJ_CASES_THEN SUBST_ALL_TAC) THENL
+     [ASM_ARITH_TAC;
+      SUBGOAL_THEN `a = &0` SUBST1_TAC THENL
+       [UNDISCH_TAC `&0 = a * &n` THEN UNDISCH_TAC `&0 < &n` THEN
+        CONV_TAC REAL_FIELD;
+        REWRITE_TAC[BINARY_ENTROPY_0_1; SUB_0] THEN REAL_ARITH_TAC];
+      SUBGOAL_THEN `a = &1` SUBST1_TAC THENL
+       [UNDISCH_TAC `&n = a * &n` THEN UNDISCH_TAC `&0 < &n` THEN
+        CONV_TAC REAL_FIELD;
+        REWRITE_TAC[BINARY_ENTROPY_0_1; SUB_REFL] THEN REAL_ARITH_TAC]]] THEN
   SUBGOAL_THEN `&0 < &n /\ &0 < &k /\ &0 < &(n - k) /\ &0 < log(&2)`
   STRIP_ASSUME_TAC THENL
    [REWRITE_TAC[REAL_OF_NUM_LT] THEN
@@ -1357,16 +1385,17 @@ let BINARY_ENTROPY_RATIO_LOG = prove
   REPEAT GEN_TAC THEN DISCH_THEN SUBST1_TAC THEN REAL_ARITH_TAC);;
 
 let LOG_BINOM_ENTROPY = prove
- (`!d n k a.
-     (!n. d n = log(&(FACT n)) - ((&n + &1 / &2) * log(&n) - &n)) /\
+ (`!n k a.
      0 < k /\ k < n /\ &k = a * &n
      ==> log(&(binom(n,k))) =
          log(&2 rpow (&n * binary_entropy a) /
              sqrt(&2 * pi * &n * a * (&1 - a))) +
-         (d n - d k - d(n - k) + log(&2 * pi) / &2)`,
+         (stirling_remainder n - stirling_remainder k -
+          stirling_remainder(n - k))`,
   REPEAT GEN_TAC THEN DISCH_THEN STRIP_ASSUME_TAC THEN
+  REWRITE_TAC[stirling_remainder] THEN
   MP_TAC(SPECL [`n:num`; `k:num`; `a:real`] BINARY_ENTROPY_RATIO_LOG) THEN
-  ANTS_TAC THENL [ASM_REWRITE_TAC[]; DISCH_TAC] THEN
+  ANTS_TAC THENL [ASM_SIMP_TAC[LT_IMP_LE]; DISCH_TAC] THEN
   SUBGOAL_THEN `&0 < &n /\ &0 < &k /\ &0 < &(n - k) /\ &0 < pi`
   STRIP_ASSUME_TAC THENL
    [REWRITE_TAC[REAL_OF_NUM_LT; PI_POS] THEN ASM_ARITH_TAC; ALL_TAC] THEN
@@ -1517,19 +1546,14 @@ let BINOM_ENTROPY_INEQUALITY = prove
     REPEAT(MATCH_MP_TAC REAL_LT_MUL THEN CONJ_TAC) THEN
     REWRITE_TAC[PI_POS] THEN ASM_REAL_ARITH_TAC;
     ALL_TAC] THEN
-  MP_TAC(SPECL [`\n. log(&(FACT n)) - ((&n + &1 / &2) * log(&n) - &n)`;
-                `n:num`; `k:num`; `a:real`] LOG_BINOM_ENTROPY) THEN
+  MP_TAC(SPECL [`n:num`; `k:num`; `a:real`] LOG_BINOM_ENTROPY) THEN
   ANTS_TAC THENL [ASM_REWRITE_TAC[]; DISCH_TAC] THEN
-  MP_TAC(SPECL [`\n. log(&(FACT n)) - ((&n + &1 / &2) * log(&n) - &n)`;
-                `n:num`] STIRLING_REMAINDER_BOUNDS) THEN
-  REWRITE_TAC[] THEN ANTS_TAC THENL [ASM_ARITH_TAC; DISCH_TAC] THEN
-  MP_TAC(SPECL [`\n. log(&(FACT n)) - ((&n + &1 / &2) * log(&n) - &n)`;
-                `k:num`] STIRLING_REMAINDER_BOUNDS) THEN
-  REWRITE_TAC[] THEN ANTS_TAC THENL [ASM_ARITH_TAC; DISCH_TAC] THEN
-  MP_TAC(SPECL [`\n. log(&(FACT n)) - ((&n + &1 / &2) * log(&n) - &n)`;
-                `n - k:num`] STIRLING_REMAINDER_BOUNDS) THEN
-  REWRITE_TAC[] THEN ANTS_TAC THENL [ASM_ARITH_TAC; DISCH_TAC] THEN
-  RULE_ASSUM_TAC BETA_RULE THEN
+  MP_TAC(SPEC `n:num` STIRLING_REMAINDER_BOUNDS) THEN
+  ANTS_TAC THENL [ASM_ARITH_TAC; DISCH_TAC] THEN
+  MP_TAC(SPEC `k:num` STIRLING_REMAINDER_BOUNDS) THEN
+  ANTS_TAC THENL [ASM_ARITH_TAC; DISCH_TAC] THEN
+  MP_TAC(SPEC `n - k:num` STIRLING_REMAINDER_BOUNDS) THEN
+  ANTS_TAC THENL [ASM_ARITH_TAC; DISCH_TAC] THEN
   SUBGOAL_THEN `&1 / (&12 * &n) <= &1 / (&12 * &k + &1) /\
                 &0 <= &1 / (&12 * &(n - k) + &1)` STRIP_ASSUME_TAC THENL
    [REWRITE_TAC[real_div; REAL_MUL_LID] THEN CONJ_TAC THENL
@@ -1610,19 +1634,15 @@ let BINARY_ENTROPY_SYM = prove
   REWRITE_TAC[binary_entropy; REAL_ARITH `&1 - (&1 - x) = x`] THEN
   REAL_ARITH_TAC);;
 
-let BINARY_ENTROPY_0 = prove
- (`binary_entropy(&0) = &0 /\ binary_entropy(&1) = &0`,
-  REWRITE_TAC[binary_entropy; REAL_SUB_REFL; REAL_SUB_RZERO; LOG_1] THEN
-  REAL_ARITH_TAC);;
-
 let BINARY_ENTROPY_LE_MUL_LOG = prove
  (`!x. &0 <= x /\ x <= &1 ==> binary_entropy x <= x * log(&4 / x) / log(&2)`,
   GEN_TAC THEN STRIP_TAC THEN
   ASM_CASES_TAC `x = &0` THENL
-   [ASM_REWRITE_TAC[BINARY_ENTROPY_0; REAL_MUL_LZERO; real_div; REAL_LE_REFL];
+   [ASM_REWRITE_TAC[BINARY_ENTROPY_0_1; REAL_MUL_LZERO; real_div;
+                    REAL_LE_REFL];
     ALL_TAC] THEN
   ASM_CASES_TAC `x = &1` THENL
-   [ASM_REWRITE_TAC[BINARY_ENTROPY_0; REAL_MUL_LID; REAL_DIV_1] THEN
+   [ASM_REWRITE_TAC[BINARY_ENTROPY_0_1; REAL_MUL_LID; REAL_DIV_1] THEN
     MATCH_MP_TAC REAL_LE_DIV THEN SIMP_TAC[REAL_LT_IMP_LE; LOG_2_POS] THEN
     MATCH_MP_TAC LOG_POS THEN REAL_ARITH_TAC;
     ALL_TAC] THEN
@@ -1843,7 +1863,7 @@ let BINARY_ENTROPY_GE_QUADRATIC = prove
                     ==> &4 * x * (&1 - x) <= binary_entropy x`
   ASSUME_TAC THENL
    [REPEAT STRIP_TAC THEN ASM_CASES_TAC `x = &0` THENL
-     [ASM_REWRITE_TAC[BINARY_ENTROPY_0] THEN REAL_ARITH_TAC; ALL_TAC] THEN
+     [ASM_REWRITE_TAC[BINARY_ENTROPY_0_1] THEN REAL_ARITH_TAC; ALL_TAC] THEN
     ASM_CASES_TAC `x <= &1 / &5` THENL
      [MATCH_MP_TAC BINARY_ENTROPY_GE_QUADRATIC_SMALL THEN ASM_REAL_ARITH_TAC;
       MP_TAC(SPEC `&1 / &2 - x` BINARY_ENTROPY_HALF_SUB_LOWER) THEN
@@ -1870,7 +1890,7 @@ let BINARY_ENTROPY_QUADRATIC_INEQUALITY_GEN = prove
                         &1 - &2 / log(&2) * y pow 2`
   ASSUME_TAC THENL
    [REPEAT STRIP_TAC THEN ASM_CASES_TAC `y = &1 / &2` THENL
-     [ASM_REWRITE_TAC[REAL_SUB_REFL; BINARY_ENTROPY_0] THEN
+     [ASM_REWRITE_TAC[REAL_SUB_REFL; BINARY_ENTROPY_0_1] THEN
       CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
       MP_TAC LOG_2_BOUNDS THEN MP_TAC LOG_2_POS THEN
       SPEC_TAC(`log(&2)`, `l:real`) THEN REPEAT STRIP_TAC THEN
@@ -1912,11 +1932,11 @@ let BINARY_ENTROPY_RPOW = prove
            --(log(x rpow x * (&1 - x) rpow (&1 - x)) / log(&2))`,
   GEN_TAC THEN STRIP_TAC THEN
   ASM_CASES_TAC `x = &0` THENL
-   [ASM_REWRITE_TAC[BINARY_ENTROPY_0; RPOW_ZERO; REAL_SUB_RZERO; RPOW_ONE;
+   [ASM_REWRITE_TAC[BINARY_ENTROPY_0_1; RPOW_ZERO; REAL_SUB_RZERO; RPOW_ONE;
                     REAL_MUL_LID; LOG_1] THEN REAL_ARITH_TAC;
     ALL_TAC] THEN
   ASM_CASES_TAC `x = &1` THENL
-   [ASM_REWRITE_TAC[BINARY_ENTROPY_0; RPOW_ZERO; REAL_SUB_REFL; RPOW_ONE;
+   [ASM_REWRITE_TAC[BINARY_ENTROPY_0_1; RPOW_ZERO; REAL_SUB_REFL; RPOW_ONE;
                     REAL_MUL_RID; LOG_1] THEN REAL_ARITH_TAC;
     ALL_TAC] THEN
   SUBGOAL_THEN `&0 < x /\ &0 < &1 - x` STRIP_ASSUME_TAC THENL
@@ -1930,11 +1950,11 @@ let BINARY_ENTROPY_GE_LOG_MUL_LOG = prove
            <= binary_entropy x`,
   GEN_TAC THEN STRIP_TAC THEN
   ASM_CASES_TAC `x = &0` THENL
-   [ASM_REWRITE_TAC[BINARY_ENTROPY_0; REAL_SUB_RZERO; LOG_1; real_div;
+   [ASM_REWRITE_TAC[BINARY_ENTROPY_0_1; REAL_SUB_RZERO; LOG_1; real_div;
                     REAL_MUL_LZERO; REAL_MUL_RZERO; REAL_LE_REFL];
     ALL_TAC] THEN
   ASM_CASES_TAC `x = &1` THENL
-   [ASM_REWRITE_TAC[BINARY_ENTROPY_0; REAL_SUB_REFL; LOG_1; real_div;
+   [ASM_REWRITE_TAC[BINARY_ENTROPY_0_1; REAL_SUB_REFL; LOG_1; real_div;
                     REAL_MUL_LZERO; REAL_MUL_RZERO; REAL_LE_REFL];
     ALL_TAC] THEN
   SUBGOAL_THEN `&0 < x /\ x < &1` STRIP_ASSUME_TAC THENL
@@ -2117,7 +2137,7 @@ let SUM_BINOM_LE_ENTROPY = prove
       SUBGOAL_THEN `a = &0` SUBST1_TAC THENL
        [UNDISCH_TAC `a * &n = &0` THEN
         ASM_REWRITE_TAC[REAL_ENTIRE; REAL_OF_NUM_EQ];
-        REWRITE_TAC[BINARY_ENTROPY_0; REAL_MUL_RZERO]];
+        REWRITE_TAC[BINARY_ENTROPY_0_1; REAL_MUL_RZERO]];
       REWRITE_TAC[RPOW_0; REAL_LE_REFL]]] THEN
   MP_TAC(SPECL [`n:num`; `k:num`; `a:real`] SUM_BINOM_MUL_EXP_ENTROPY_LE) THEN
   ASM_REWRITE_TAC[] THEN
@@ -2193,7 +2213,9 @@ let BINOM_TAIL_INEQUALITY = prove
 
 let REAL_NONNEG_DERIVATIVE_ONCE_NEG = prove
  (`!f f' a b.
-     (!x. a <= x /\ x <= b ==> (f has_real_derivative f' x) (atreal x)) /\
+     (!x. a <= x /\ x <= b
+          ==> (f has_real_derivative f' x)
+              (atreal x within real_interval[a,b])) /\
      &0 <= f a /\ &0 <= f b /\
      (!u v. a <= u /\ u <= v /\ v <= b /\ f' u < &0 ==> f' v <= &0)
      ==> !x. a <= x /\ x <= b ==> &0 <= f x`,
@@ -2203,8 +2225,10 @@ let REAL_NONNEG_DERIVATIVE_ONCE_NEG = prove
                 REAL_MVT_VERY_SIMPLE) THEN
   ANTS_TAC THENL
    [ASM_REWRITE_TAC[IN_REAL_INTERVAL] THEN REPEAT STRIP_TAC THEN
-    MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN
-    FIRST_X_ASSUM MATCH_MP_TAC THEN ASM_REAL_ARITH_TAC;
+    MATCH_MP_TAC HAS_REAL_DERIVATIVE_WITHIN_SUBSET THEN
+    EXISTS_TAC `real_interval[a,b]` THEN CONJ_TAC THENL
+     [FIRST_X_ASSUM MATCH_MP_TAC THEN ASM_REAL_ARITH_TAC;
+      REWRITE_TAC[SUBSET; IN_REAL_INTERVAL] THEN ASM_REAL_ARITH_TAC];
     ALL_TAC] THEN
   REWRITE_TAC[IN_REAL_INTERVAL] THEN
   DISCH_THEN(X_CHOOSE_THEN `z:real` STRIP_ASSUME_TAC) THEN
@@ -2221,15 +2245,19 @@ let REAL_NONNEG_DERIVATIVE_ONCE_NEG = prove
   REWRITE_TAC[IS_REALINTERVAL_INTERVAL; IN_REAL_INTERVAL] THEN
   DISCH_THEN MATCH_MP_TAC THEN ASM_REWRITE_TAC[REAL_LE_REFL] THEN
   CONJ_TAC THEN X_GEN_TAC `t:real` THEN STRIP_TAC THENL
-   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN
-    MATCH_MP_TAC HAS_REAL_DERIVATIVE_NEG THEN
-    FIRST_X_ASSUM MATCH_MP_TAC THEN ASM_REAL_ARITH_TAC;
+   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_NEG THEN
+    MATCH_MP_TAC HAS_REAL_DERIVATIVE_WITHIN_SUBSET THEN
+    EXISTS_TAC `real_interval[a,b]` THEN CONJ_TAC THENL
+     [FIRST_X_ASSUM MATCH_MP_TAC THEN ASM_REAL_ARITH_TAC;
+      REWRITE_TAC[SUBSET; IN_REAL_INTERVAL] THEN ASM_REAL_ARITH_TAC];
     REWRITE_TAC[REAL_NEG_GE0] THEN FIRST_X_ASSUM MATCH_MP_TAC THEN
     EXISTS_TAC `z:real` THEN ASM_REAL_ARITH_TAC]);;
 
-let REAL_DERIVATIVE_ONCE_NEG_SECOND = prove
+let REAL_DERIVATIVE_ONCE_NONNEG_IMP_ONCE_NEG = prove
  (`!g g' a b.
-     (!x. a <= x /\ x <= b ==> (g has_real_derivative g' x) (atreal x)) /\
+     (!x. a <= x /\ x <= b
+          ==> (g has_real_derivative g' x)
+              (atreal x within real_interval[a,b])) /\
      g b <= &0 /\
      (!u v. a <= u /\ u <= v /\ v <= b /\ &0 <= g' u ==> &0 <= g' v)
      ==> !u v. a <= u /\ u <= v /\ v <= b /\ g u < &0 ==> g v <= &0`,
@@ -2242,8 +2270,10 @@ let REAL_DERIVATIVE_ONCE_NEG_SECOND = prove
     REWRITE_TAC[IS_REALINTERVAL_INTERVAL; IN_REAL_INTERVAL] THEN
     DISCH_THEN MATCH_MP_TAC THEN ASM_REWRITE_TAC[REAL_LE_REFL] THEN
     CONJ_TAC THEN X_GEN_TAC `t:real` THEN STRIP_TAC THENL
-     [MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN
-      FIRST_X_ASSUM MATCH_MP_TAC THEN ASM_REAL_ARITH_TAC;
+     [MATCH_MP_TAC HAS_REAL_DERIVATIVE_WITHIN_SUBSET THEN
+      EXISTS_TAC `real_interval[a,b]` THEN CONJ_TAC THENL
+       [FIRST_X_ASSUM MATCH_MP_TAC THEN ASM_REAL_ARITH_TAC;
+        REWRITE_TAC[SUBSET; IN_REAL_INTERVAL] THEN ASM_REAL_ARITH_TAC];
       FIRST_X_ASSUM MATCH_MP_TAC THEN EXISTS_TAC `v:real` THEN
       ASM_REAL_ARITH_TAC];
     ALL_TAC] THEN
@@ -2255,9 +2285,11 @@ let REAL_DERIVATIVE_ONCE_NEG_SECOND = prove
   REWRITE_TAC[IS_REALINTERVAL_INTERVAL; IN_REAL_INTERVAL] THEN
   DISCH_THEN MATCH_MP_TAC THEN ASM_REWRITE_TAC[REAL_LE_REFL] THEN
   CONJ_TAC THEN X_GEN_TAC `t:real` THEN STRIP_TAC THENL
-   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN
-    MATCH_MP_TAC HAS_REAL_DERIVATIVE_NEG THEN
-    FIRST_X_ASSUM MATCH_MP_TAC THEN ASM_REAL_ARITH_TAC;
+   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_NEG THEN
+    MATCH_MP_TAC HAS_REAL_DERIVATIVE_WITHIN_SUBSET THEN
+    EXISTS_TAC `real_interval[a,b]` THEN CONJ_TAC THENL
+     [FIRST_X_ASSUM MATCH_MP_TAC THEN ASM_REAL_ARITH_TAC;
+      REWRITE_TAC[SUBSET; IN_REAL_INTERVAL] THEN ASM_REAL_ARITH_TAC];
     REWRITE_TAC[REAL_NEG_GE0] THEN
     MATCH_MP_TAC(REAL_ARITH `~(&0 <= x) ==> x <= &0`) THEN DISCH_TAC THEN
     UNDISCH_TAC `~(&0 <= (g':real->real) v)` THEN REWRITE_TAC[] THEN
@@ -2287,9 +2319,33 @@ let TANGENT_LOG_DERIVATIVE_2 = prove
 
 let TANGENT_LOG_NONNEG = prove
  (`!p q x. p * log(&2) = &1 / &2 /\ q * log(&2) + &2 * p = &1 /\
-           q < &0 /\ &0 < p + q /\ &0 <= x /\ x < &1
+           &0 <= x /\ x < &1
            ==> &0 <= (p + q * (x - &1 / &2)) * --log(&1 - x) - x`,
   REPEAT GEN_TAC THEN STRIP_TAC THEN
+  SUBGOAL_THEN `q < &0 /\ &0 < p + q` STRIP_ASSUME_TAC THENL
+   [MP_TAC LOG_2_BOUNDS THEN MP_TAC LOG_2_POS THEN
+    DISCH_TAC THEN DISCH_THEN STRIP_ASSUME_TAC THEN
+    SUBGOAL_THEN
+     `p = &1 / (&2 * log(&2)) /\ q = (log(&2) - &1) / log(&2) pow 2`
+    (CONJUNCTS_THEN SUBST_ALL_TAC) THENL
+     [CONJ_TAC THEN UNDISCH_TAC `q * log(&2) + &2 * p = &1` THEN
+      UNDISCH_TAC `p * log(&2) = &1 / &2` THEN UNDISCH_TAC `&0 < log(&2)` THEN
+      CONV_TAC REAL_FIELD;
+      ALL_TAC] THEN
+    CONJ_TAC THENL
+     [REWRITE_TAC[REAL_ARITH `x < &0 <=> &0 < --x`; real_div;
+                  GSYM REAL_MUL_LNEG] THEN
+      MATCH_MP_TAC REAL_LT_MUL THEN
+      ASM_SIMP_TAC[REAL_LT_INV_EQ; REAL_POW_LT] THEN ASM_REAL_ARITH_TAC;
+      SUBGOAL_THEN
+       `&1 / (&2 * log(&2)) + (log(&2) - &1) / log(&2) pow 2 =
+        (&3 * log(&2) - &2) / (&2 * log(&2) pow 2)`
+      SUBST1_TAC THENL
+       [UNDISCH_TAC `&0 < log(&2)` THEN CONV_TAC REAL_FIELD; ALL_TAC] THEN
+      MATCH_MP_TAC REAL_LT_DIV THEN
+      ASM_SIMP_TAC[REAL_LT_MUL; REAL_POW_LT; REAL_ARITH `&0 < &2`] THEN
+      ASM_REAL_ARITH_TAC];
+    ALL_TAC] THEN
   SUBGOAL_THEN `log(&1 - &1 / &2) = --log(&2)` ASSUME_TAC THENL
    [CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
     SIMP_TAC[LOG_DIV; REAL_ARITH `&0 < &1 /\ &0 < &2`; LOG_1] THEN
@@ -2337,12 +2393,14 @@ let TANGENT_LOG_NONNEG = prove
     ANTS_TAC THENL
      [ALL_TAC; DISCH_THEN MATCH_MP_TAC THEN ASM_REWRITE_TAC[]] THEN
     ASM_REWRITE_TAC[REAL_LE_REFL] THEN CONJ_TAC THENL
-     [REPEAT STRIP_TAC THEN FIRST_X_ASSUM MATCH_MP_TAC THEN ASM_REAL_ARITH_TAC;
+     [REPEAT STRIP_TAC THEN MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN
+      FIRST_X_ASSUM MATCH_MP_TAC THEN ASM_REAL_ARITH_TAC;
       ALL_TAC] THEN
-    MATCH_MP_TAC REAL_DERIVATIVE_ONCE_NEG_SECOND THEN
+    MATCH_MP_TAC REAL_DERIVATIVE_ONCE_NONNEG_IMP_ONCE_NEG THEN
     EXISTS_TAC `\y. (p + q * (&3 / &2 - y)) / (&1 - y) pow 2` THEN
     ASM_REWRITE_TAC[REAL_LE_REFL] THEN CONJ_TAC THENL
-     [REPEAT STRIP_TAC THEN FIRST_X_ASSUM MATCH_MP_TAC THEN ASM_REAL_ARITH_TAC;
+     [REPEAT STRIP_TAC THEN MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN
+      FIRST_X_ASSUM MATCH_MP_TAC THEN ASM_REAL_ARITH_TAC;
       ALL_TAC] THEN
     REPEAT GEN_TAC THEN STRIP_TAC THEN BETA_TAC THEN
     MP_TAC(SPEC `v:real` (ASSUME `!y. y < &1
@@ -2399,11 +2457,11 @@ let BINARY_ENTROPY_LE_LOG_MUL_LOG = prove
        ==> binary_entropy x <= log x / log(&2) * log(&1 - x) / log(&2)`,
   GEN_TAC THEN STRIP_TAC THEN
   ASM_CASES_TAC `x = &0` THENL
-   [ASM_REWRITE_TAC[BINARY_ENTROPY_0; REAL_SUB_RZERO; LOG_1; real_div;
+   [ASM_REWRITE_TAC[BINARY_ENTROPY_0_1; REAL_SUB_RZERO; LOG_1; real_div;
                     REAL_MUL_LZERO; REAL_MUL_RZERO; REAL_LE_REFL];
     ALL_TAC] THEN
   ASM_CASES_TAC `x = &1` THENL
-   [ASM_REWRITE_TAC[BINARY_ENTROPY_0; REAL_SUB_REFL; LOG_1; real_div;
+   [ASM_REWRITE_TAC[BINARY_ENTROPY_0_1; REAL_SUB_REFL; LOG_1; real_div;
                     REAL_MUL_LZERO; REAL_MUL_RZERO; REAL_LE_REFL];
     ALL_TAC] THEN
   SUBGOAL_THEN `&0 < x /\ x < &1` STRIP_ASSUME_TAC THENL
@@ -2419,20 +2477,8 @@ let BINARY_ENTROPY_LE_LOG_MUL_LOG = prove
     MP_TAC(SPECL [`&1 / (&2 * log(&2))`; `(log(&2) - &1) / log(&2) pow 2`;
                   `y:real`] TANGENT_LOG_NONNEG) THEN
     ANTS_TAC THENL [ALL_TAC; REAL_ARITH_TAC] THEN
-    ASM_REWRITE_TAC[] THEN REPEAT CONJ_TAC THENL
-     [UNDISCH_TAC `&0 < log(&2)` THEN CONV_TAC REAL_FIELD;
-      UNDISCH_TAC `&0 < log(&2)` THEN CONV_TAC REAL_FIELD;
-      REWRITE_TAC[REAL_ARITH `x < &0 <=> &0 < --x`; real_div;
-                  GSYM REAL_MUL_LNEG] THEN
-      MATCH_MP_TAC REAL_LT_MUL THEN
-      ASM_SIMP_TAC[REAL_LT_INV_EQ; REAL_POW_LT] THEN ASM_REAL_ARITH_TAC;
-      SUBGOAL_THEN `&1 / (&2 * log(&2)) + (log(&2) - &1) / log(&2) pow 2 =
-                    (&3 * log(&2) - &2) / (&2 * log(&2) pow 2)`
-      SUBST1_TAC THENL
-       [UNDISCH_TAC `&0 < log(&2)` THEN CONV_TAC REAL_FIELD; ALL_TAC] THEN
-      MATCH_MP_TAC REAL_LT_DIV THEN
-      ASM_SIMP_TAC[REAL_LT_MUL; REAL_POW_LT; REAL_ARITH `&0 < &2`] THEN
-      ASM_REAL_ARITH_TAC];
+    ASM_REWRITE_TAC[] THEN CONJ_TAC THEN
+    UNDISCH_TAC `&0 < log(&2)` THEN CONV_TAC REAL_FIELD;
     ALL_TAC] THEN
   FIRST_ASSUM(MP_TAC o SPEC `x:real`) THEN
   FIRST_X_ASSUM(MP_TAC o SPEC `&1 - x`) THEN
@@ -2488,7 +2534,7 @@ let BINARY_ENTROPY_LE_LOG_MUL_LOG = prove
 (* (1-s^2) L(s) >= 2s H((1-s)/2) on [0,1).                                   *)
 (* ------------------------------------------------------------------------- *)
 
-let ENTROPY_PSI_DERIVATIVE_1 = prove
+let HAS_REAL_DERIVATIVE_LOG_RATIO_ENTROPY_1 = prove
  (`!c s. abs s < &1
          ==> ((\s. (&1 - s pow 2) * (log(&1 + s) - log(&1 - s)) - &2 * s +
                    &2 * c * s *
@@ -2504,7 +2550,7 @@ let ENTROPY_PSI_DERIVATIVE_1 = prove
    [CONJ_TAC THEN MATCH_MP_TAC REAL_MUL_RINV THEN ASM_REAL_ARITH_TAC;
     CONV_TAC REAL_RING]);;
 
-let ENTROPY_PSI_DERIVATIVE_2 = prove
+let HAS_REAL_DERIVATIVE_LOG_RATIO_ENTROPY_2 = prove
  (`!c s. abs s < &1
          ==> ((\s. &2 * c *
                    ((&1 + s) * log(&1 + s) + (&1 - s) * log(&1 - s)) -
@@ -2522,7 +2568,7 @@ let ENTROPY_PSI_DERIVATIVE_2 = prove
                 REAL_ENTIRE] THEN ASM_REAL_ARITH_TAC;
     REWRITE_TAC[real_div] THEN CONV_TAC REAL_RING]);;
 
-let ENTROPY_PSI_DERIVATIVE_3 = prove
+let HAS_REAL_DERIVATIVE_LOG_RATIO_ENTROPY_3 = prove
  (`!c s. abs s < &1
          ==> ((\s. &2 * (&2 * c - &1) * (log(&1 + s) - log(&1 - s)) -
                    &4 * (&1 - c) * s / (&1 - s pow 2))
@@ -2538,9 +2584,11 @@ let ENTROPY_PSI_DERIVATIVE_3 = prove
   REPEAT CONJ_TAC THEN TRY(ASM_REAL_ARITH_TAC) THEN
   REPEAT(POP_ASSUM MP_TAC) THEN CONV_TAC REAL_FIELD);;
 
-let REAL_DERIVATIVE_ONCE_NEG_PROPAGATE = prove
+let REAL_DERIVATIVE_ONCE_NEG_IMP_ONCE_NEG = prove
  (`!g g' a b.
-     (!x. a <= x /\ x < b ==> (g has_real_derivative g' x) (atreal x)) /\
+     (!x. a <= x /\ x < b
+          ==> (g has_real_derivative g' x)
+              (atreal x within {x | a <= x /\ x < b})) /\
      &0 <= g a /\
      (!u v. a <= u /\ u <= v /\ v < b /\ g' u < &0 ==> g' v <= &0)
      ==> !u v. a <= u /\ u <= v /\ v < b /\ g u < &0 ==> g v <= &0`,
@@ -2549,8 +2597,11 @@ let REAL_DERIVATIVE_ONCE_NEG_PROPAGATE = prove
                 REAL_MVT_VERY_SIMPLE) THEN
   ANTS_TAC THENL
    [ASM_REWRITE_TAC[IN_REAL_INTERVAL] THEN REPEAT STRIP_TAC THEN
-    MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN
-    FIRST_X_ASSUM MATCH_MP_TAC THEN ASM_REAL_ARITH_TAC;
+    MATCH_MP_TAC HAS_REAL_DERIVATIVE_WITHIN_SUBSET THEN
+    EXISTS_TAC `{x:real | a <= x /\ x < b}` THEN CONJ_TAC THENL
+     [FIRST_X_ASSUM MATCH_MP_TAC THEN ASM_REAL_ARITH_TAC;
+      REWRITE_TAC[SUBSET; IN_REAL_INTERVAL; IN_ELIM_THM] THEN
+      ASM_REAL_ARITH_TAC];
     ALL_TAC] THEN
   REWRITE_TAC[IN_REAL_INTERVAL] THEN
   DISCH_THEN(X_CHOOSE_THEN `z:real` STRIP_ASSUME_TAC) THEN
@@ -2567,18 +2618,29 @@ let REAL_DERIVATIVE_ONCE_NEG_PROPAGATE = prove
   REWRITE_TAC[IS_REALINTERVAL_INTERVAL; IN_REAL_INTERVAL] THEN
   DISCH_THEN MATCH_MP_TAC THEN ASM_REWRITE_TAC[REAL_LE_REFL] THEN
   CONJ_TAC THEN X_GEN_TAC `t:real` THEN STRIP_TAC THENL
-   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN
-    MATCH_MP_TAC HAS_REAL_DERIVATIVE_NEG THEN
-    FIRST_X_ASSUM MATCH_MP_TAC THEN ASM_REAL_ARITH_TAC;
+   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_NEG THEN
+    MATCH_MP_TAC HAS_REAL_DERIVATIVE_WITHIN_SUBSET THEN
+    EXISTS_TAC `{x:real | a <= x /\ x < b}` THEN CONJ_TAC THENL
+     [FIRST_X_ASSUM MATCH_MP_TAC THEN ASM_REAL_ARITH_TAC;
+      REWRITE_TAC[SUBSET; IN_REAL_INTERVAL; IN_ELIM_THM] THEN
+      ASM_REAL_ARITH_TAC];
     REWRITE_TAC[REAL_NEG_GE0] THEN FIRST_X_ASSUM MATCH_MP_TAC THEN
     EXISTS_TAC `z:real` THEN ASM_REAL_ARITH_TAC]);;
 
-let BINARY_ENTROPY_HALF_K = prove
- (`!s. abs s < &1
+let BINARY_ENTROPY_HALF_SUB_EXPAND = prove
+ (`!s. abs s <= &1
        ==> binary_entropy((&1 - s) / &2) =
            &1 - ((&1 + s) * log(&1 + s) + (&1 - s) * log(&1 - s)) /
                 (&2 * log(&2))`,
-  REPEAT STRIP_TAC THEN REWRITE_TAC[binary_entropy] THEN
+  REPEAT STRIP_TAC THEN ASM_CASES_TAC `abs s = &1` THENL
+   [FIRST_X_ASSUM(DISJ_CASES_THEN SUBST1_TAC o MATCH_MP
+      (REAL_ARITH `abs s = &1 ==> s = &1 \/ s = -- &1`)) THEN
+    CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
+    REWRITE_TAC[BINARY_ENTROPY_0_1; REAL_MUL_LZERO; REAL_ADD_LID;
+                REAL_ADD_RID] THEN
+    MP_TAC LOG_2_POS THEN CONV_TAC REAL_FIELD;
+    ALL_TAC] THEN
+  REWRITE_TAC[binary_entropy] THEN
   SUBGOAL_THEN `&1 - (&1 - s) / &2 = (&1 + s) / &2` SUBST1_TAC THENL
    [REAL_ARITH_TAC; ALL_TAC] THEN
   SUBGOAL_THEN `&0 < &1 - s /\ &0 < &1 + s` STRIP_ASSUME_TAC THENL
@@ -2626,7 +2688,7 @@ let BINARY_ENTROPY_LE_SQRT = prove
       MATCH_MP_TAC REAL_LE_MUL THEN MP_TAC LOG_2_POS THEN ASM_REAL_ARITH_TAC];
     ASM_REAL_ARITH_TAC]);;
 
-let ENTROPY_PSI_NONNEG = prove
+let BINARY_ENTROPY_HALF_MUL_LE_LOG_RATIO = prove
  (`!s. &0 <= s /\ s < &1
        ==> &2 * s * binary_entropy((&1 - s) / &2)
            <= (&1 - s pow 2) * (log(&1 + s) - log(&1 - s))`,
@@ -2639,7 +2701,8 @@ let ENTROPY_PSI_NONNEG = prove
   SUBGOAL_THEN `!t. abs t < &1 ==> binary_entropy((&1 - t) / &2) =
                   &1 - c * ((&1 + t) * log(&1 + t) + (&1 - t) * log(&1 - t))`
   ASSUME_TAC THENL
-   [REPEAT STRIP_TAC THEN ASM_SIMP_TAC[BINARY_ENTROPY_HALF_K] THEN
+   [REPEAT STRIP_TAC THEN
+    ASM_SIMP_TAC[BINARY_ENTROPY_HALF_SUB_EXPAND; REAL_LT_IMP_LE] THEN
     EXPAND_TAC "c" THEN REAL_ARITH_TAC;
     ALL_TAC] THEN
   ABBREV_TAC `p0 = \s. (&1 - s pow 2) * (log(&1 + s) - log(&1 - s)) -
@@ -2659,11 +2722,20 @@ let ENTROPY_PSI_NONNEG = prove
   STRIP_ASSUME_TAC THENL
    [MAP_EVERY EXPAND_TAC ["p0"; "p1"; "p2"; "p3"] THEN REPEAT CONJ_TAC THEN
     REPEAT STRIP_TAC THENL
-     [MATCH_MP_TAC ENTROPY_PSI_DERIVATIVE_1;
-      MATCH_MP_TAC ENTROPY_PSI_DERIVATIVE_2;
-      MATCH_MP_TAC ENTROPY_PSI_DERIVATIVE_3] THEN
+     [MATCH_MP_TAC HAS_REAL_DERIVATIVE_LOG_RATIO_ENTROPY_1;
+      MATCH_MP_TAC HAS_REAL_DERIVATIVE_LOG_RATIO_ENTROPY_2;
+      MATCH_MP_TAC HAS_REAL_DERIVATIVE_LOG_RATIO_ENTROPY_3] THEN
     ASM_REAL_ARITH_TAC;
     ALL_TAC] THEN
+  SUBGOAL_THEN
+   `(!s. &0 <= s /\ s < &1
+         ==> (p1 has_real_derivative p2 s)
+             (atreal s within {x | &0 <= x /\ x < &1})) /\
+    (!s. &0 <= s /\ s < &1
+         ==> (p2 has_real_derivative p3 s)
+             (atreal s within {x | &0 <= x /\ x < &1}))`
+  STRIP_ASSUME_TAC THENL
+   [ASM_SIMP_TAC[HAS_REAL_DERIVATIVE_ATREAL_WITHIN]; ALL_TAC] THEN
   SUBGOAL_THEN `(p0:real->real) (&0) = &0 /\ (p1:real->real) (&0) = &0 /\
                 (p2:real->real) (&0) = &0` STRIP_ASSUME_TAC THENL
    [MAP_EVERY EXPAND_TAC ["p0"; "p1"; "p2"] THEN
@@ -2694,10 +2766,10 @@ let ENTROPY_PSI_NONNEG = prove
     REWRITE_TAC[REAL_LE_INV_EQ; REAL_LE_POW_2] THEN ASM_REAL_ARITH_TAC;
     ALL_TAC] THEN
   MP_TAC(ISPECL [`p2:real->real`; `p3:real->real`; `&0`; `&1`]
-                REAL_DERIVATIVE_ONCE_NEG_PROPAGATE) THEN
+                REAL_DERIVATIVE_ONCE_NEG_IMP_ONCE_NEG) THEN
   ASM_REWRITE_TAC[REAL_LE_REFL] THEN DISCH_TAC THEN
   MP_TAC(ISPECL [`p1:real->real`; `p2:real->real`; `&0`; `&1`]
-                REAL_DERIVATIVE_ONCE_NEG_PROPAGATE) THEN
+                REAL_DERIVATIVE_ONCE_NEG_IMP_ONCE_NEG) THEN
   ASM_REWRITE_TAC[REAL_LE_REFL] THEN DISCH_TAC THEN
   SUBGOAL_THEN `&0 <= (p0:real->real) s` MP_TAC THENL
    [ALL_TAC;
@@ -2822,7 +2894,8 @@ let BINARY_ENTROPY_HALF_LE_RPOW = prove
   SUBGOAL_THEN `!t. abs t < &1 ==> binary_entropy((&1 - t) / &2) =
                   &1 - c * ((&1 + t) * log(&1 + t) + (&1 - t) * log(&1 - t))`
   ASSUME_TAC THENL
-   [REPEAT STRIP_TAC THEN ASM_SIMP_TAC[BINARY_ENTROPY_HALF_K] THEN
+   [REPEAT STRIP_TAC THEN
+    ASM_SIMP_TAC[BINARY_ENTROPY_HALF_SUB_EXPAND; REAL_LT_IMP_LE] THEN
     EXPAND_TAC "c" THEN REAL_ARITH_TAC;
     ALL_TAC] THEN
   SUBGOAL_THEN
@@ -2875,7 +2948,7 @@ let BINARY_ENTROPY_HALF_LE_RPOW = prove
   (MP_TAC(SPEC `t:real` (ASSUME `!t. &0 <= t /\ t < &1
      ==> &0 < binary_entropy((&1 - t) / &2) /\ &0 < &1 - t pow 2`)) THEN
    ANTS_TAC THENL [ASM_REAL_ARITH_TAC; ALL_TAC] THEN
-   MP_TAC(SPEC `t:real` ENTROPY_PSI_NONNEG) THEN
+   MP_TAC(SPEC `t:real` BINARY_ENTROPY_HALF_MUL_LE_LOG_RATIO) THEN
    ANTS_TAC THENL [ASM_REAL_ARITH_TAC; ALL_TAC] THEN
    MP_TAC(SPEC `t:real` (ASSUME `!t. abs t < &1
        ==> binary_entropy ((&1 - t) / &2) =
@@ -2915,7 +2988,7 @@ let BINARY_ENTROPY_LE_RPOW = prove
                         (&4 * x * (&1 - x)) rpow (&1 / (&2 * log(&2)))`
   ASSUME_TAC THENL
    [REPEAT STRIP_TAC THEN ASM_CASES_TAC `x = &0` THENL
-     [ASM_REWRITE_TAC[BINARY_ENTROPY_0] THEN MATCH_MP_TAC RPOW_POS_LE THEN
+     [ASM_REWRITE_TAC[BINARY_ENTROPY_0_1] THEN MATCH_MP_TAC RPOW_POS_LE THEN
       REAL_ARITH_TAC;
       ALL_TAC] THEN
     MP_TAC(SPEC `&1 - &2 * x` BINARY_ENTROPY_HALF_LE_RPOW) THEN

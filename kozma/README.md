@@ -11,6 +11,8 @@ Inequalities" (version 0.44).
   means.ml           Inequalities between means and weighted products
   binomial_entropy.ml  Binomial coefficients, Stirling's formula and the
                      binary entropy
+  convexity.ml       Convexity, majorization and integral inequalities
+  series.ml          Series inequalities (Mathieu, Hilbert, Hardy)
 
 To load all files:
 
@@ -20,8 +22,13 @@ Deviations from the sheet:
 
   - Sums and products over 1..n are generalized to any finite index set
     where the order of the terms does not matter (Cauchy-Schwarz,
-    Kantorovich, Milne, Chebyshev, the first sum & product inequality).
-  - Chebyshev's sum inequality does not assume x_1 <= ... <= x_n.
+    Kantorovich, Milne, Chebyshev, Samuelson, Nesbitt, the first part of
+    Chong, both sum & product inequalities).
+  - Chebyshev's sum inequality does not assume x_1 <= ... <= x_n, and f, g
+    need be nondecreasing only on the values x_i.
+  - The second sum & product inequality holds for t >= 0, and a_i >= 0
+    suffices. The third rearrangement inequality needs only
+    a_i + b_j >= 0 for all i, j instead of a_i, b_i >= 0.
   - Nesbitt: the terms a_i / (S - a_i) are undefined when a_i = S, so
     a_i < S is assumed; a_i >= 0 is not needed. In Milne a term with
     a_i + b_i = 0 has value 0.
@@ -30,9 +37,11 @@ Deviations from the sheet:
   - Abel: the minimum and maximum of the partial sums are written as
     inf and sup of the (finite) set of partial sums, for n >= 1.
   - Aczel's inequality is split by the two alternative hypotheses, which
-    are relaxed to non-strict ones. Samuelson's two bounds are combined
-    into one bound on |x_i - mu|.
-  - Only the cases n = 3, 4 of Shapiro's inequality are proved.
+    are relaxed to non-strict ones; both are instances of a general form
+    with any reals u, v in place of a_1, b_1 over any finite index set.
+    Samuelson's two bounds are combined into one bound on |x_i - mu|.
+  - Only the cases n = 3, 4 of Shapiro's inequality are proved; for n = 3
+    only the sums x_{i+1} + x_{i+2} need be positive.
   - Chong: the second part is in means.ml, over any finite index set and
     for a_i >= 0 (with 0^0 = 1).
   - Means (means.ml): sums and products range over any finite index set,
@@ -77,7 +86,8 @@ Deviations from the sheet:
     excluded; x < 1/r is written r x < 1, and the second inequality
     holds for r >= 0 and for r <= -1. The third holds for all x > -1,
     the fifth whenever (n + 1) x >= -1 and for every x when n is odd,
-    and the sixth includes n = 0.
+    and the sixth includes n = 0 and needs only a >= 0 and a + b >= 0
+    (b may be negative).
   - Exponential: the first line holds for x >= -n (real n >= 1), the
     second for x >= 0, with n a natural number >= 1 in the n! bound and
     real n > 0 elsewhere. e^(2x) <= (1 + x)/(1 - x) holds on [0, 1),
@@ -101,6 +111,8 @@ Deviations from the sheet:
     its last link x < pi/2; it is also proved multiplied by x on the closed
     interval. x cos^2(x/2) <= sin x and sin x <= x cos(x/2) hold on
     [0, pi], and sin x <= (x cos x + 2x)/3 for all x >= 0.
+  - Square root: the first link of the first line holds for every x > 0,
+    and the middle link of the second line for every x >= 0.
   - Binomial (binomial_entropy.ml): the first lower bound of Binomial 1
     needs k <= n; n^k/k! <= (en/k)^k also holds for k = 0 and real x >= 0
     in place of n. sqrt n >= k is written k^2 <= n, and n^k/k! (1 -
@@ -117,5 +129,32 @@ Deviations from the sheet:
     second term and the fourth term exceeds en(n/e)^n. The whole chain
     holds for n >= 2, the two middle links (the Robbins bounds) and
     e(n/e)^n <= n! <= en(n/e)^n for n >= 1.
+  - Jensen (convexity.ml): the convex form is HOL Light's
+    REAL_CONVEX_ON_IMP_JENSEN; the concave form is stated with -phi convex.
+    Both need phi on a real interval and a finite index set.
+  - Cauchy: f'(a) and f'(b) are derivatives within [a,b], which covers the
+    one-sided and the two-sided readings.
+  - Gibbs and Pinsker: any finite index set; b_i = 0 forces a_i = 0 (and in
+    the general form a_i = 0 forces b_i = 0), and 0 log(0/.) = 0. The
+    general form also holds when sum a_i = 0. Pinsker is proved in natural
+    logarithms, which is stronger, and in bits.
+  - Schur-Vornicu: every natural k, including k = 0, with no sign condition
+    on x, y, z; f >= 0 and convex or monotone on any set containing them.
+  - Sum & integral: for any real a with L = a + 1 and U = a + n, n natural;
+    each half holds with monotonicity on its own interval.
+  - Hermite: integrability of a convex function is proved, not assumed; the
+    form multiplied by b - a holds for a <= b.
+  - Young (integral form): f continuous and strictly increasing on [0,c]
+    with f(0) = 0 and g(f(x)) = x there, for 0 <= a <= c and
+    0 <= b <= f(c); also on [0, infinity) for b in the range of f.
+  - Karamata and Muirhead: only b is assumed nonincreasing. Muirhead uses
+    real exponents, with x_i > 0, or x_i >= 0 and a_i >= 0 (0^0 = 1).
+  - Hilbert (series.ml): proved for every finite rectangle with |a_m b_n|
+    and no hypotheses. For square-summable a and b the iterated series
+    converge (every inner series, and the outer one) and satisfy the bound.
+  - Hardy: for every partial sum with a_i >= 0, and for series when
+    sum a_n^p converges (the left series then converges).
+  - Mathieu: the series converges for every c; the lower bound also holds
+    at c = 0.
 
 Distributed with HOL Light under the same license terms.

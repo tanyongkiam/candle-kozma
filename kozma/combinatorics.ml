@@ -202,12 +202,40 @@ let FKG_INEQUALITY_ALT = prove
 (* theorem applied to its finite subsets, which are again prefix-free.       *)
 (* ------------------------------------------------------------------------- *)
 
-let KRAFT_INEQUALITY_BOUNDED = prove
- (`!n s (W:(A list)->bool).
-     FINITE s /\ FINITE W /\
-     (!w. w IN W ==> ALL (\x. x IN s) w /\ LENGTH w <= n) /\
+let KRAFT_INEQUALITY_GEN = prove
+ (`!s (W:(A list)->bool).
+     FINITE s /\
+     (!w. w IN W ==> ALL (\x. x IN s) w) /\
      (!u v. u IN W /\ APPEND u v IN W ==> v = [])
      ==> sum W (\w. inv(&(CARD s) pow LENGTH w)) <= &1`,
+  SUBGOAL_THEN
+   `!n s (W:(A list)->bool).
+      FINITE s /\ FINITE W /\
+      (!w. w IN W ==> ALL (\x. x IN s) w /\ LENGTH w <= n) /\
+      (!u v. u IN W /\ APPEND u v IN W ==> v = [])
+      ==> sum W (\w. inv(&(CARD s) pow LENGTH w)) <= &1`
+  ASSUME_TAC THENL
+   [ALL_TAC;
+    REPEAT STRIP_TAC THEN ASM_CASES_TAC `FINITE(W:(A list)->bool)` THENL
+     [MP_TAC(ISPEC `IMAGE LENGTH (W:(A list)->bool)` num_FINITE) THEN
+      ASM_SIMP_TAC[FINITE_IMAGE; FORALL_IN_IMAGE] THEN
+      DISCH_THEN(X_CHOOSE_TAC `n:num`) THEN
+      FIRST_X_ASSUM MATCH_MP_TAC THEN EXISTS_TAC `n:num` THEN
+      ASM_MESON_TAC[];
+      ALL_TAC] THEN
+    SUBGOAL_THEN `~(CARD(s:A->bool) = 0)` ASSUME_TAC THENL
+     [ASM_SIMP_TAC[CARD_EQ_0] THEN DISCH_TAC THEN
+      UNDISCH_TAC `~FINITE(W:(A list)->bool)` THEN REWRITE_TAC[] THEN
+      MATCH_MP_TAC FINITE_SUBSET THEN EXISTS_TAC `{[]:A list}` THEN
+      REWRITE_TAC[FINITE_SING; SUBSET; IN_SING] THEN
+      X_GEN_TAC `w:A list` THEN DISCH_TAC THEN
+      MP_TAC(ISPEC `w:A list` list_CASES) THEN
+      ASM_MESON_TAC[ALL; NOT_IN_EMPTY];
+      ALL_TAC] THEN
+    MATCH_MP_TAC(REAL_ARITH `x = &0 ==> x <= &1`) THEN
+    MATCH_MP_TAC SUM_DEGENERATE THEN
+    ASM_REWRITE_TAC[REAL_INV_EQ_0; REAL_POW_EQ_0; REAL_OF_NUM_EQ;
+                    SET_RULE `!s:B->bool. {x | x IN s} = s`]] THEN
   INDUCT_TAC THEN REPEAT GEN_TAC THEN STRIP_TAC THEN
   (ASM_CASES_TAC `([]:A list) IN W` THENL
     [SUBGOAL_THEN `W = {[]:A list}` SUBST1_TAC THENL
@@ -269,33 +297,6 @@ let KRAFT_INEQUALITY_BOUNDED = prove
     REWRITE_TAC[SUBSET; IN_ELIM_THM; IN_IMAGE] THEN MESON_TAC[TL];
     ASM_MESON_TAC[ALL; LENGTH; LE_SUC];
     ASM_MESON_TAC[APPEND]]);;
-
-let KRAFT_INEQUALITY_GEN = prove
- (`!s (W:(A list)->bool).
-     FINITE s /\
-     (!w. w IN W ==> ALL (\x. x IN s) w) /\
-     (!u v. u IN W /\ APPEND u v IN W ==> v = [])
-     ==> sum W (\w. inv(&(CARD s) pow LENGTH w)) <= &1`,
-  REPEAT STRIP_TAC THEN ASM_CASES_TAC `FINITE(W:(A list)->bool)` THENL
-   [MP_TAC(ISPEC `IMAGE LENGTH (W:(A list)->bool)` num_FINITE) THEN
-    ASM_SIMP_TAC[FINITE_IMAGE; FORALL_IN_IMAGE] THEN
-    DISCH_THEN(X_CHOOSE_TAC `n:num`) THEN
-    MATCH_MP_TAC KRAFT_INEQUALITY_BOUNDED THEN EXISTS_TAC `n:num` THEN
-    ASM_MESON_TAC[];
-    ALL_TAC] THEN
-  SUBGOAL_THEN `~(CARD(s:A->bool) = 0)` ASSUME_TAC THENL
-   [ASM_SIMP_TAC[CARD_EQ_0] THEN DISCH_TAC THEN
-    UNDISCH_TAC `~FINITE(W:(A list)->bool)` THEN REWRITE_TAC[] THEN
-    MATCH_MP_TAC FINITE_SUBSET THEN EXISTS_TAC `{[]:A list}` THEN
-    REWRITE_TAC[FINITE_SING; SUBSET; IN_SING] THEN
-    X_GEN_TAC `w:A list` THEN DISCH_TAC THEN
-    MP_TAC(ISPEC `w:A list` list_CASES) THEN
-    ASM_MESON_TAC[ALL; NOT_IN_EMPTY];
-    ALL_TAC] THEN
-  MATCH_MP_TAC(REAL_ARITH `x = &0 ==> x <= &1`) THEN
-  MATCH_MP_TAC SUM_DEGENERATE THEN
-  ASM_REWRITE_TAC[REAL_INV_EQ_0; REAL_POW_EQ_0; REAL_OF_NUM_EQ;
-                  SET_RULE `!s:B->bool. {x | x IN s} = s`]);;
 
 let KRAFT_INEQUALITY = prove
  (`!W:(bool list)->bool.
@@ -404,8 +405,9 @@ let LYM_INEQUALITY = prove
 
 (* ------------------------------------------------------------------------- *)
 (* Shattered sets and the Vapnik-Chervonenkis dimension of a set system.     *)
-(* A set x is shattered by A when its traces {x INTER y | y IN A} are all    *)
-(* subsets of x; vc_dimension A is the largest size of a shattered set.      *)
+(* A set x is shattered by A when every subset of x is a trace x INTER y     *)
+(* for some y IN A, i.e. the traces {x INTER y | y IN A} are all the subsets *)
+(* of x; vc_dimension A is the largest size of a shattered set.              *)
 (* ------------------------------------------------------------------------- *)
 
 let shattered = new_definition
@@ -722,85 +724,19 @@ let SAUER_SHELAH_INEQUALITY = prove
 (* A = {}, t = 0 with a nonempty family, where 0^0 = 1 > 0.                  *)
 (* ------------------------------------------------------------------------- *)
 
-let SHEARER_STEP_POW = prove
- (`!x y r s w t.
-     1 <= t /\ &0 <= x /\ &0 <= y /\ &0 <= r /\ &0 <= s /\ r + s <= &1 /\
-     &0 <= w /\ x pow t <= w * r pow t /\ y pow t <= w * s pow t
-     ==> (x + y) pow t <= w`,
-  REPEAT STRIP_TAC THEN
-  SUBGOAL_THEN
-   `!z u. &0 <= z /\ &0 <= u /\ u <= &1 /\ z pow t <= w * u pow t
-          ==> z pow t <= w`
-  (LABEL_TAC "h1") THENL
-   [REPEAT STRIP_TAC THEN TRANS_TAC REAL_LE_TRANS `(w:real) * u pow t` THEN
-    ASM_REWRITE_TAC[] THEN GEN_REWRITE_TAC RAND_CONV [GSYM REAL_MUL_RID] THEN
-    MATCH_MP_TAC REAL_LE_LMUL THEN ASM_SIMP_TAC[REAL_POW_1_LE];
-    ALL_TAC] THEN
-  SUBGOAL_THEN
-   `!z u. &0 <= z /\ u = &0 /\ z pow t <= w * u pow t ==> z = &0`
-  (LABEL_TAC "h2") THENL
-   [REPEAT STRIP_TAC THEN UNDISCH_TAC `(z:real) pow t <= w * u pow t` THEN
-    ASM_REWRITE_TAC[REAL_POW_ZERO] THEN
-    COND_CASES_TAC THENL [ASM_ARITH_TAC; ALL_TAC] THEN
-    REWRITE_TAC[REAL_MUL_RZERO] THEN DISCH_TAC THEN
-    MP_TAC(SPECL [`z:real`; `t:num`] REAL_POW_LE) THEN
-    ASM_REWRITE_TAC[] THEN DISCH_TAC THEN
-    SUBGOAL_THEN `z pow t = &0` MP_TAC THENL
-     [ASM_REAL_ARITH_TAC; ASM_REWRITE_TAC[REAL_POW_EQ_0] THEN ASM_ARITH_TAC];
-    ALL_TAC] THEN
-  ASM_CASES_TAC `r = &0` THENL
-   [SUBGOAL_THEN `x = &0` SUBST1_TAC THENL
-     [USE_THEN "h2" MATCH_MP_TAC THEN EXISTS_TAC `r:real` THEN
-      ASM_REWRITE_TAC[];
-      REWRITE_TAC[REAL_ADD_LID]] THEN
-    USE_THEN "h1" MATCH_MP_TAC THEN EXISTS_TAC `s:real` THEN
-    ASM_REWRITE_TAC[] THEN ASM_REAL_ARITH_TAC;
-    ALL_TAC] THEN
-  ASM_CASES_TAC `s = &0` THENL
-   [SUBGOAL_THEN `y = &0` SUBST1_TAC THENL
-     [USE_THEN "h2" MATCH_MP_TAC THEN EXISTS_TAC `s:real` THEN
-      ASM_REWRITE_TAC[];
-      REWRITE_TAC[REAL_ADD_RID]] THEN
-    USE_THEN "h1" MATCH_MP_TAC THEN EXISTS_TAC `r:real` THEN
-    ASM_REWRITE_TAC[] THEN ASM_REAL_ARITH_TAC;
-    ALL_TAC] THEN
-  SUBGOAL_THEN `&0 < r /\ &0 < s` STRIP_ASSUME_TAC THENL
-   [ASM_REAL_ARITH_TAC; ALL_TAC] THEN
-  SUBGOAL_THEN `((x:real) / r) pow t <= w /\ ((y:real) / s) pow t <= w`
-  STRIP_ASSUME_TAC THENL
-   [ASM_SIMP_TAC[REAL_POW_DIV; REAL_LE_LDIV_EQ; REAL_POW_LT]; ALL_TAC] THEN
-  SUBGOAL_THEN `(x:real) = r * x / r /\ (y:real) = s * y / s` MP_TAC THENL
-   [ASM_SIMP_TAC[REAL_DIV_LMUL; REAL_LT_IMP_NZ]; ALL_TAC] THEN
-  SUBGOAL_THEN `&0 <= x / r /\ &0 <= y / s` MP_TAC THENL
-   [ASM_SIMP_TAC[REAL_LE_DIV; REAL_LT_IMP_LE]; ALL_TAC] THEN
-  UNDISCH_TAC `((x:real) / r) pow t <= w` THEN
-  UNDISCH_TAC `((y:real) / s) pow t <= w` THEN
-  SPEC_TAC(`(x:real) / r`,`a:real`) THEN SPEC_TAC(`(y:real) / s`,`b:real`) THEN
-  REPEAT GEN_TAC THEN REPEAT DISCH_TAC THEN
-  FIRST_X_ASSUM(CONJUNCTS_THEN SUBST1_TAC) THEN
-  DISJ_CASES_TAC(REAL_ARITH `(a:real) <= b \/ b <= a`) THENL
-   [TRANS_TAC REAL_LE_TRANS `(b:real) pow t`;
-    TRANS_TAC REAL_LE_TRANS `(a:real) pow t`] THEN
-  ASM_REWRITE_TAC[] THEN MATCH_MP_TAC REAL_POW_LE2 THEN
-  (CONJ_TAC THENL
-    [MATCH_MP_TAC REAL_LE_ADD THEN CONJ_TAC THEN
-     MATCH_MP_TAC REAL_LE_MUL THEN ASM_REAL_ARITH_TAC;
-     ALL_TAC])
-  THENL
-   [MP_TAC(SPECL [`r:real`; `a:real`; `b:real`] REAL_LE_LMUL) THEN
-    MP_TAC(SPECL [`r + s:real`; `&1`; `b:real`] REAL_LE_RMUL);
-    MP_TAC(SPECL [`s:real`; `b:real`; `a:real`] REAL_LE_LMUL) THEN
-    MP_TAC(SPECL [`r + s:real`; `&1`; `a:real`] REAL_LE_RMUL)] THEN
-  ASM_SIMP_TAC[REAL_LT_IMP_LE] THEN REAL_ARITH_TAC);;
-
 let SHEARER_STEP_PRODUCT = prove
  (`!C M (p:B->real) q c x y t.
-     FINITE C /\ M SUBSET C /\ 1 <= t /\ t <= CARD M /\
+     FINITE C /\ M SUBSET C /\ t <= CARD M /\
      (!f. f IN C ==> &0 <= p f /\ &0 <= q f /\ p f <= c f /\ q f <= c f) /\
      (!f. f IN M ==> p f + q f <= c f) /\
      &0 <= x /\ &0 <= y /\ x pow t <= product C p /\ y pow t <= product C q
      ==> (x + y) pow t <= product C c`,
-  REPEAT STRIP_TAC THEN
+  REPEAT STRIP_TAC THEN ASM_CASES_TAC `t = 0` THENL
+   [TRANS_TAC REAL_LE_TRANS `product C (p:B->real)` THEN CONJ_TAC THENL
+     [UNDISCH_TAC `x pow t <= product C (p:B->real)` THEN
+      ASM_REWRITE_TAC[real_pow];
+      MATCH_MP_TAC PRODUCT_LE THEN ASM_SIMP_TAC[]];
+    ALL_TAC] THEN
   SUBGOAL_THEN `FINITE(M:B->bool)` ASSUME_TAC THENL
    [ASM_MESON_TAC[FINITE_SUBSET]; ALL_TAC] THEN
   SUBGOAL_THEN `!f:B. f IN M ==> f IN C` ASSUME_TAC THENL
@@ -892,7 +828,7 @@ let SHEARER_STEP_PRODUCT = prove
      [MATCH_MP_TAC SUM_LE THEN ASM_SIMP_TAC[];
       ASM_SIMP_TAC[SUM_CONST; REAL_MUL_RID; REAL_LE_REFL]];
     ALL_TAC] THEN
-  MATCH_MP_TAC SHEARER_STEP_POW THEN
+  MATCH_MP_TAC REAL_POW_ADD_LE_SPLIT THEN
   MAP_EVERY EXISTS_TAC
    [`sum M (\f:B. p f / c f) / &(CARD(M:B->bool))`;
     `sum M (\f:B. q f / c f) / &(CARD(M:B->bool))`] THEN

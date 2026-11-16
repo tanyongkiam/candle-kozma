@@ -17,8 +17,8 @@ Formal proofs of inequalities from László Kozma's sheet "Useful Inequalities"
 | `convexity.ml` | Convexity, majorization and integral inequalities |
 | `series.ml` | Series inequalities (Mathieu, Hilbert, Hardy) |
 | `probability_basic.ml` | Moment and tail inequalities for one random variable, Bonferroni |
-| `probability_concentration.ml` | Planned: concentration inequalities for sums of random variables |
-| `probability_maximal.ml` | Planned: maximal inequalities, martingales, Janson and Lovász |
+| `probability_concentration.ml` | Concentration inequalities for sums of independent and k-wise independent random variables, and Azuma's inequality |
+| `probability_maximal.ml` | Planned: maximal inequalities, Janson and Lovász |
 | `matrix.ml` | Planned: matrix inequalities |
 
 To load all files:
@@ -149,7 +149,7 @@ H is `binary_entropy`, -(x ln x + (1-x) ln(1-x))/ln 2, equal to -lg(x^x (1-x)^(1
 | Gibbs 2 | `GIBBS_INEQUALITY_GEN` | Any finite index set; phi concave on a real interval s, with b_i/a_i in s where a_i > 0; a_i = 0 forces b_i = 0; no sign condition on b_i. Also holds when sum a_i = 0. |
 | Pinsker | `PINSKER_INEQUALITY`, `PINSKER_INEQUALITY_LOG` | Any finite index set; b_i = 0 forces a_i = 0, and 0 log(0/.) = 0. Proved in natural logarithms, which is stronger, and in bits. |
 | Schur-Vornicu | `SCHUR_VORNICU_INEQUALITY`, `SCHUR_VORNICU_INEQUALITY_GEN` | Every natural k, including k = 0, with no sign condition on x, y, z; f >= 0 and convex or monotone on any set containing them. |
-| Young 2 | `YOUNG_INTEGRAL_INEQUALITY`, `YOUNG_INTEGRAL_INEQUALITY_ALT` | f continuous and strictly increasing on [0,c] with f(0) = 0 and g(f(x)) = x there, for 0 <= a <= c and 0 <= b <= f(c); also on [0, infinity) for b in the range of f. |
+| Young 2 | `YOUNG_INTEGRAL_INEQUALITY`, `YOUNG_INTEGRAL_INEQUALITY_ALT` | f(0) = 0 and b in the range of f (hypotheses the PDF leaves implicit; false without f(0) = 0), with f^(-1) given as g with g(f(x)) = x: `_ALT` on [0, infinity). The main theorem needs f only on [0,c], for 0 <= a <= c and 0 <= b <= f(c). |
 | Karamata | `KARAMATA_INEQUALITY`, `KARAMATA_INEQUALITY_CONCAVE` | Only b is assumed nonincreasing. |
 | Muirhead | `MUIRHEAD_INEQUALITY` | Only b is assumed nonincreasing. Real exponents, with x_i > 0, or x_i >= 0 and a_i >= 0 (0^0 = 1). |
 
@@ -184,24 +184,30 @@ Range hypotheses hold almost surely; the sure forms are instances.
 | 4th moment | `FOURTH_MOMENT_INEQUALITY`, `FOURTH_MOMENT_INEQUALITY_DIV` | 0 < E[X^4] is not needed; also as a product. |
 | Paley-Zygmund | `PALEY_ZYGMUND_INEQUALITY`, `PALEY_ZYGMUND_INEQUALITY_DIV`, `PALEY_ZYGMUND_VARIANCE`, `PALEY_ZYGMUND_HOELDER` | E[X] >= 0 in place of X >= 0, and delta in [0,1]; also the variance form and the form for any exponent q > 1. |
 
-### Concentration (`probability_concentration.ml`, planned)
+### Concentration (`probability_concentration.ml`)
+
+Independence of a family X_i (i in any index set) is `indep_rv_family`; k-wise
+independence is `kwise_indep_rv_family`. Both use the joint CDFs of finite
+subfamilies, as the library's `mutually_indep_rv_seq` does (`INDEP_RV_FAMILY_SEQ`).
+Range hypotheses hold almost surely.
 
 | Entry | Theorems | Remarks |
 |---|---|---|
-| kth moment 2 | planned | |
-| Chernoff 1 | planned | |
-| Chernoff 2 | planned | The printed hypotheses are contradictory (X_i in {0,1} and Pr[X_i = ±1] = 1/2); to be stated for independent X_i with E[X_i] = 0 and \|X_i\| <= 1, which covers X_i = ±1 with probability 1/2. |
-| Chernoff 3 | planned | |
-| Chernoff 4 | planned | |
-| Chernoff 5 | planned | |
-| Chernoff 6 | planned | |
-| Chernoff 7 | planned | |
-| Hoeffding | planned | |
-| Hoeffding lemma | planned | |
-| Bennett | planned | |
-| Bernstein | planned | |
-| Efron-Stein | planned | |
-| McDiarmid | planned | |
+| kth moment 2 | `KTH_MOMENT_KWISE_INEQUALITY`, `KWISE_CENTRED_MOMENT_BOUND` | X_i in [0,1], k-wise independent, k even and k >= 2 (at k = 0 the printed constant is undefined), t > 0. The moment bound E[(X - mu)^k] <= C_k (nk/e)^(k/2) is proved first. |
+| Chernoff 1 | `CHERNOFF_PGF_INEQUALITY`, `CHERNOFF_PGF_INEQUALITY_GEN` | a >= 1. The series form for X natural-number-valued with the series summable; the general form E[a^X] / a^t for any X with a^X integrable. |
+| Chernoff 2 | `CHERNOFF_SYMMETRIC_TAILS`, `CHERNOFF_SYMMETRIC_TAILS_EQ` | The printed hypotheses are contradictory (X_i in {0,1} and Pr[X_i = ±1] = 1/2); stated for independent X_i with E[X_i] = 0 and \|X_i\| <= 1, which covers X_i = ±1 with probability 1/2, and d >= 0. The two tails are equal for independent symmetric X_i, with no bound on X_i and for any d. |
+| Chernoff 3 | `CHERNOFF_UPPER_INEQUALITY` | Independent X_i in [0,1], mu = sum E[X_i], d >= 0. |
+| Chernoff 4 | `CHERNOFF_LOWER_INEQUALITY`, `CHERNOFF_LOWER_INEQUALITY_GEN` | As Chernoff 3 with d in [0,1]; the end bound exp(-mu d^2 / 2) holds for every d >= 0. |
+| Chernoff 5 | `CHERNOFF_FAR_INEQUALITY` | As Chernoff 3, r >= 2e mu. |
+| Chernoff 6 | `CHERNOFF_KWISE_INEQUALITY`, `CHERNOFF_KWISE_CORE` | X_i in {0,1}, k-wise independent, common mean p; t > k - 1 (at t = k - 1 the bound is 0, and below it the inequality fails, e.g. k = 2, t = -1). C(t,k) is written out as prod (t - j + 1) / k!. The core theorem allows X_i in [0,1] with any means. |
+| Chernoff 7 | `CHERNOFF_KWISE_UNIT_INEQUALITY` | As printed, without delta > 0. k-hat is a natural number with k-hat = ceiling(mu delta / (1 - p)), so the statement is vacuous when the ceiling would be negative. |
+| Hoeffding | `HOEFFDING_INEQUALITY`, `HOEFFDING_INEQUALITY_UPPER` | Independent X_i with a_i <= X_i <= b_i, d >= 0; also one-sided. When sum (b_i - a_i)^2 = 0 the bound is 2. |
+| Hoeffding lemma | `HOEFFDING_LEMMA_EXPECTATION`, `HOEFFDING_LEMMA_CENTRED` | Any real lambda, no a < b (a = b forces X = 0); also for any mean, with X - E[X]. |
+| Bennett | `BENNETT_INEQUALITY_GEN`, `BENNETT_INEQUALITY` | General form: no mean-zero hypothesis, finite second moments, raw second moments V = sum E[X_i^2], the centred sum, one-sided X_i <= M, for every real M (V = 0 or M = 0 give the bound 1). The sheet's form (E[X_i] = 0, \|X_i\| <= M, sigma^2 = sum Var[X_i] / n) is a corollary. |
+| Bernstein | `BERNSTEIN_INEQUALITY_GEN`, `BERNSTEIN_INEQUALITY` | As Bennett; the general form with X_i <= M, the sheet's form with \|X_i\| < M as printed. |
+| Azuma | `AZUMA_INEQUALITY`, `AZUMA_INEQUALITY_UPPER` | Any filtration; \|X_i - X_(i-1)\| <= c_i for 1 <= i <= n (weaker than the printed < c_i), d >= 0. When sum c_i^2 = 0 the bound is 2. |
+| Efron-Stein | deferred | Needs independent copies on a product space; the statement is fixed for that round. |
+| McDiarmid | deferred | As Efron-Stein. |
 
 ### Maximal inequalities, martingales and dependency (`probability_maximal.ml`, planned)
 
@@ -213,7 +219,6 @@ Range hypotheses hold almost surely; the sure forms are instances.
 | VPG 3 | planned | |
 | Etemadi | planned | |
 | Doob | planned | |
-| Azuma | planned | |
 | Janson | planned | |
 | Lovász 1 | planned | |
 | Lovász 2 | planned | |

@@ -2233,6 +2233,7 @@ let SUM_PRODUCT_SUBSETS_INSERT = prove
   MATCH_MP_TAC SUM_EQ THEN X_GEN_TAC `t:A->bool` THEN
   REWRITE_TAC[IN_ELIM_THM; HAS_SIZE] THEN STRIP_TAC THEN
   ASM_SIMP_TAC[PRODUCT_CLAUSES] THEN COND_CASES_TAC THEN ASM SET_TAC[]);;
+
 let symmetric_mean = new_definition
  `symmetric_mean (s:A->bool) a k =
     sum {t | t SUBSET s /\ t HAS_SIZE k} (\t. product t a) /

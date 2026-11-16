@@ -12,3 +12,6 @@ needs "kozma/binomial_entropy.ml";;  (* Binomials, Stirling, entropy       *)
 needs "kozma/convexity.ml";;         (* Convexity, majorization, integrals *)
 needs "kozma/series.ml";;            (* Mathieu, Hilbert, Hardy            *)
 needs "kozma/probability_basic.ml";; (* Moments and tails, Bonferroni      *)
+needs "kozma/probability_concentration.ml";;
+                                     (* Chernoff, Hoeffding, Bennett,      *)
+                                     (* Bernstein, k-wise bounds, Azuma    *)

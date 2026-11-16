@@ -145,6 +145,75 @@ let EXP_1_BOUNDS = prove
   REAL_ARITH_TAC);;
 
 (* ------------------------------------------------------------------------- *)
+(* e <= (1 + 1/n)^(n+1), and the elementary factorial bound                  *)
+(* n! <= e n (n/e)^n for n >= 1.                                             *)
+(* ------------------------------------------------------------------------- *)
+
+let EXP_LE_ONE_ADD_INV_POW = prove
+ (`!n. 1 <= n ==> exp(&1) <= (&1 + &1 / &n) pow (n + 1)`,
+  REPEAT STRIP_TAC THEN SUBGOAL_THEN `&0 < &n` ASSUME_TAC THENL
+   [REWRITE_TAC[REAL_OF_NUM_LT] THEN ASM_ARITH_TAC;
+    ALL_TAC] THEN SUBGOAL_THEN `&0 < &1 + &1 / &n` ASSUME_TAC THENL
+   [MATCH_MP_TAC(REAL_ARITH `&0 <= x ==> &0 < &1 + x`) THEN
+    ASM_SIMP_TAC[REAL_LE_DIV; REAL_POS];
+    ALL_TAC] THEN
+  FIRST_ASSUM(fun th -> GEN_REWRITE_TAC(RAND_CONV o LAND_CONV)
+                [GSYM(MATCH_MP EXP_LOG th)]) THEN
+  REWRITE_TAC[GSYM REAL_EXP_N; REAL_EXP_MONO_LE] THEN
+  MP_TAC(SPEC `&1 / &n` LOG_GE_DIV) THEN ANTS_TAC THENL
+   [MATCH_MP_TAC(REAL_ARITH `&0 <= x ==> -- &1 < x`) THEN
+    ASM_SIMP_TAC[REAL_LE_DIV; REAL_POS];
+    ALL_TAC] THEN
+  SUBGOAL_THEN `&1 / &n / (&1 + &1 / &n) = inv(&(n + 1))` SUBST1_TAC THENL
+   [REWRITE_TAC[GSYM REAL_OF_NUM_ADD] THEN UNDISCH_TAC `&0 < &n` THEN
+    CONV_TAC REAL_FIELD;
+    ALL_TAC] THEN DISCH_TAC THEN SUBGOAL_THEN `&0 < &(n + 1)` ASSUME_TAC THENL
+   [REWRITE_TAC[REAL_OF_NUM_LT] THEN ARITH_TAC;
+    ALL_TAC] THEN MATCH_MP_TAC REAL_LE_TRANS THEN
+  EXISTS_TAC `&(n + 1) * inv(&(n + 1))` THEN CONJ_TAC THENL
+   [ASM_SIMP_TAC[REAL_MUL_RINV; REAL_LT_IMP_NZ; REAL_LE_REFL];
+    MATCH_MP_TAC REAL_LE_LMUL THEN ASM_REWRITE_TAC[REAL_POS]]);;
+
+let FACT_LE_EXP_MUL_POW = prove
+ (`!n. 1 <= n ==> &(FACT n) <= exp(&1) * &n * (&n / exp(&1)) pow n`,
+  MATCH_MP_TAC num_INDUCTION THEN REWRITE_TAC[ARITH] THEN
+  X_GEN_TAC `n:num` THEN DISCH_TAC THEN DISCH_TAC THEN
+  SUBGOAL_THEN `&0 < exp(&1)` ASSUME_TAC THENL
+   [REWRITE_TAC[REAL_EXP_POS_LT];
+    ALL_TAC] THEN ASM_CASES_TAC `n = 0` THENL
+   [ASM_REWRITE_TAC[] THEN CONV_TAC NUM_REDUCE_CONV THEN
+    REWRITE_TAC[REAL_POW_1; REAL_MUL_LID] THEN UNDISCH_TAC `&0 < exp(&1)` THEN
+    CONV_TAC REAL_FIELD;
+    ALL_TAC] THEN FIRST_X_ASSUM(MP_TAC o check(is_imp o concl)) THEN
+  ANTS_TAC THENL [ASM_ARITH_TAC; DISCH_TAC] THEN
+  REWRITE_TAC[FACT; GSYM REAL_OF_NUM_MUL] THEN MATCH_MP_TAC REAL_LE_TRANS THEN
+  EXISTS_TAC `&(SUC n) * exp(&1) * &n * (&n / exp(&1)) pow n` THEN
+  CONJ_TAC THENL
+   [MATCH_MP_TAC REAL_LE_LMUL THEN ASM_REWRITE_TAC[REAL_POS];
+    ALL_TAC] THEN MP_TAC(SPEC `n:num` EXP_LE_ONE_ADD_INV_POW) THEN
+  ANTS_TAC THENL [ASM_ARITH_TAC; ALL_TAC] THEN
+  SUBGOAL_THEN `&0 < &n` ASSUME_TAC THENL
+   [REWRITE_TAC[REAL_OF_NUM_LT] THEN ASM_ARITH_TAC;
+    ALL_TAC] THEN SUBGOAL_THEN `&1 + &1 / &n = &(SUC n) / &n` SUBST1_TAC THENL
+   [REWRITE_TAC[GSYM REAL_OF_NUM_SUC] THEN UNDISCH_TAC `&0 < &n` THEN
+    CONV_TAC REAL_FIELD;
+    ALL_TAC] THEN REWRITE_TAC[GSYM ADD1; REAL_POW_DIV] THEN
+  SUBGOAL_THEN `&0 < &n pow SUC n /\ &0 < exp(&1) pow n /\ &0 < &(SUC n)`
+    STRIP_ASSUME_TAC THENL
+   [ASM_SIMP_TAC[REAL_POW_LT; REAL_OF_NUM_LT; LT_0];
+    ALL_TAC] THEN ASM_SIMP_TAC[REAL_LE_RDIV_EQ] THEN DISCH_TAC THEN
+  SUBGOAL_THEN
+    `&(SUC n) * exp(&1) * &n * &n pow n / exp(&1) pow n =
+     (&(SUC n) / exp(&1) pow n) * (exp(&1) * &n pow SUC n) /\
+     exp(&1) * &(SUC n) * &(SUC n) pow SUC n / exp(&1) pow SUC n =
+     (&(SUC n) / exp(&1) pow n) * &(SUC n) pow SUC n`
+    (CONJUNCTS_THEN SUBST1_TAC) THENL
+   [REWRITE_TAC[real_pow] THEN UNDISCH_TAC `&0 < exp(&1) pow n` THEN
+    UNDISCH_TAC `&0 < exp(&1)` THEN CONV_TAC REAL_FIELD;
+    ALL_TAC] THEN MATCH_MP_TAC REAL_LE_LMUL THEN ASM_REWRITE_TAC[] THEN
+  MATCH_MP_TAC REAL_LE_DIV THEN ASM_SIMP_TAC[REAL_POS; REAL_LT_IMP_LE]);;
+
+(* ------------------------------------------------------------------------- *)
 (* Monotonicity from the sign of the derivative on any real interval: the    *)
 (* decreasing form, comparison of two functions, the first-derivative test   *)
 (* for a minimum, and functions whose derivative changes sign at most once.  *)

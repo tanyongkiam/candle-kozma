@@ -16,7 +16,7 @@ Formal proofs of inequalities from László Kozma's sheet "Useful Inequalities"
 | `binomial_entropy.ml` | Binomial coefficients, Stirling's formula and the binary entropy |
 | `convexity.ml` | Convexity, majorization and integral inequalities |
 | `series.ml` | Series inequalities (Mathieu, Hilbert, Hardy) |
-| `probability_basic.ml` | Planned: moment and tail inequalities for one random variable |
+| `probability_basic.ml` | Moment and tail inequalities for one random variable, Bonferroni |
 | `probability_concentration.ml` | Planned: concentration inequalities for sums of random variables |
 | `probability_maximal.ml` | Planned: maximal inequalities, martingales, Janson and Lovász |
 | `matrix.ml` | Planned: matrix inequalities |
@@ -60,7 +60,7 @@ scope). Remarks: how the statement differs from the printed one, or "As printed.
 | Kraft | `KRAFT_INEQUALITY`, `KRAFT_INEQUALITY_GEN` | The leaves of a binary tree are modelled as a prefix-free set of words (a leaf's depth is the length of its word). The inequality is proved for every prefix-free set of words over any finite alphabet; for an infinite prefix-free set it applies to every finite subset. |
 | LYM | `LYM_INEQUALITY` | Antichains of subsets of any finite set instead of {1, ..., n}. |
 | FKG | `FKG_INEQUALITY`, `FKG_INEQUALITY_ALT` | "Monotone" is read as both increasing or both decreasing; the two cases are separate theorems, over any finite ground set. |
-| Shearer | `SHEARER_INEQUALITY_COUNTEREXAMPLE`, `SHEARER_INEQUALITY`, `SHEARER_INEQUALITY_GEN` | False as printed when A is empty, t = 0 and the family is nonempty (1 <= 0). This case is excluded and the printed form is refuted. Proved over any finite ground set, for any finite family, including families with repeated sets; the members need not be subsets of the ground set. |
+| Shearer | `SHEARER_INEQUALITY_COUNTEREXAMPLE`, `SHEARER_INEQUALITY`, `SHEARER_INEQUALITY_GEN` | Excludes A empty with t = 0 (0^0 = 1). Any finite ground set; members need not lie in it. `_GEN`: indexed family (repeats allowed). |
 | Sauer-Shelah | `SAUER_SHELAH_INEQUALITY`, `CARD_LE_SHATTERED`, `CARD_SHATTERED_LE_NSUM_BINOM`, `NSUM_BINOM_LE_POW`, `VC_DIMENSION` | str(A) is the set of shattered sets and vc(A) its largest size. The chain holds for every set system over a finite ground set, including the empty set system, for which vc is not defined. |
 
 ### Bernoulli and exponential (`bernoulli_exp.ml`)
@@ -162,25 +162,27 @@ H is `binary_entropy`, -(x ln x + (1-x) ln(1-x))/ln 2, equal to -lg(x^x (1-x)^(1
 | Hardy | `HARDY_INEQUALITY_FINITE`, `HARDY_INEQUALITY` | For every partial sum with a_i >= 0, and for series when sum a_n^p converges (the left series then converges). |
 | Mathieu | `MATHIEU_INEQUALITY`, `MATHIEU_INEQUALITY_LOWER` | The series converges for every c; the lower bound also holds at c = 0. |
 
-### Moments and tails of one random variable (`probability_basic.ml`, planned)
+### Moments and tails of one random variable (`probability_basic.ml`)
+
+Range hypotheses hold almost surely; the sure forms are instances.
 
 | Entry | Theorems | Remarks |
 |---|---|---|
-| Jensen (expectation form) | planned | |
-| Chebyshev (expectation form) | planned | |
+| Jensen (expectation form) | `JENSEN_EXPECTATION`, `JENSEN_EXPECTATION_CONCAVE` | phi convex on a real interval holding X; X and phi(X) integrable; the concave form is stated with -phi convex. |
+| Chebyshev (expectation form) | `CHEBYSHEV_EXPECTATION_INEQUALITY` | f, g nondecreasing on a set holding X; f(X), g(X) and f(X)g(X) integrable. |
 | Khintchine | deferred | The constant 1/sqrt 2 is Szarek's sharp constant; its proof is research scope. |
-| Bonferroni | planned | |
-| Bhatia-Davis | planned | |
-| Markov 1 | planned | |
-| Markov 2 | planned | |
-| Markov 3 | planned | |
-| Chebyshev 1 | planned | |
-| Chebyshev 2 | planned | |
-| 2nd moment 1 | planned | |
-| 2nd moment 2 | planned | |
-| kth moment 1 | planned | |
-| 4th moment | planned | |
-| Paley-Zygmund | planned | |
+| Bonferroni | `BONFERRONI_INEQUALITY` | Any finite family of events and any k. |
+| Bhatia-Davis | `BHATIA_DAVIS_INEQUALITY` | As printed. |
+| Markov 1 | `MARKOV_ABS_INEQUALITY` | X integrable. |
+| Markov 2 | `MARKOV_UPPER_INEQUALITY`, `MARKOV_UPPER_INEQUALITY_GEN` | Any c < 1, with X <= 1 and X integrable; also with any upper bound b in place of 1. |
+| Markov 3 | `MARKOV_SET_INEQUALITY` | X with values of any type; f(X) >= 0 and integrable; {X in S} an event. |
+| Chebyshev 1 | `CHEBYSHEV_INEQUALITY` (library) | As printed. |
+| Chebyshev 2 | `CANTELLI_INEQUALITY`, `CANTELLI_INEQUALITY_NEG` | As printed; also the lower tail. |
+| 2nd moment 1 | `SECOND_MOMENT_POS_INEQUALITY`, `SECOND_MOMENT_POS_INEQUALITY_DIV` | As printed; also as a product, and the quotient form needs nothing on E[X^2]. |
+| 2nd moment 2 | `SECOND_MOMENT_ZERO_INEQUALITY`, `SECOND_MOMENT_ZERO_INEQUALITY_DIV` | As printed; also as a product, with nothing on E[X^2]. |
+| kth moment 1 | `KTH_MOMENT_INEQUALITY`, `KTH_MOMENT_INEQUALITY_GEN` | k even, mu = E[X], t > 0; also with \|X - mu\|^k for real k > 0 and any mu. |
+| 4th moment | `FOURTH_MOMENT_INEQUALITY`, `FOURTH_MOMENT_INEQUALITY_DIV` | 0 < E[X^4] is not needed; also as a product. |
+| Paley-Zygmund | `PALEY_ZYGMUND_INEQUALITY`, `PALEY_ZYGMUND_INEQUALITY_DIV`, `PALEY_ZYGMUND_VARIANCE`, `PALEY_ZYGMUND_HOELDER` | E[X] >= 0 in place of X >= 0, and delta in [0,1]; also the variance form and the form for any exponent q > 1. |
 
 ### Concentration (`probability_concentration.ml`, planned)
 

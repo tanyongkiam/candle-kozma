@@ -540,7 +540,9 @@ let LYM_INEQUALITY = prove
 (* Shattered sets and the Vapnik-Chervonenkis dimension of a set system.     *)
 (* A set x is shattered by A when every subset of x is a trace x INTER y     *)
 (* for some y IN A, i.e. the traces {x INTER y | y IN A} are all the subsets *)
-(* of x; vc_dimension A is the largest size of a shattered set.              *)
+(* of x; vc_dimension A is the largest size of a shattered set when one      *)
+(* exists (A nonempty, shattered sets of bounded size), and is unspecified   *)
+(* otherwise.                                                                *)
 (* ------------------------------------------------------------------------- *)
 
 let shattered = new_definition

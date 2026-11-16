@@ -16,3 +16,6 @@ needs "kozma/probability_basic.ml";; (* Moments and tails, Bonferroni      *)
 needs "kozma/probability_concentration.ml";;
                                      (* Chernoff, Hoeffding, Bennett,      *)
                                      (* Bernstein, k-wise bounds, Azuma    *)
+needs "kozma/probability_maximal.ml";;
+                                     (* Kolmogorov, Etemadi, Doob, Gauss,  *)
+                                     (* Lovasz, Harris, Janson             *)

@@ -18,7 +18,7 @@ Formal proofs of inequalities from László Kozma's sheet "Useful Inequalities"
 | `series.ml` | Series inequalities (Mathieu, Hilbert, Hardy) |
 | `probability_basic.ml` | Moment and tail inequalities for one random variable, Bonferroni |
 | `probability_concentration.ml` | Concentration inequalities for sums of independent and k-wise independent random variables, and Azuma's inequality |
-| `probability_maximal.ml` | Planned: maximal inequalities, Janson and Lovász |
+| `probability_maximal.ml` | Maximal inequalities (Kolmogorov, Etemadi, Doob), Gauss's inequality for unimodal distributions, the Lovász local lemma, Harris's and Janson's inequalities |
 | `matrix.ml` | Hadamard's inequality and Schur's inequality for the diagonal of a symmetric matrix |
 
 To load all files:
@@ -209,19 +209,26 @@ Range hypotheses hold almost surely.
 | Efron-Stein | deferred | Needs independent copies on a product space; the statement is fixed for that round. |
 | McDiarmid | deferred | As Efron-Stein. |
 
-### Maximal inequalities, martingales and dependency (`probability_maximal.ml`, planned)
+### Maximal inequalities, martingales and dependency (`probability_maximal.ml`)
+
+Independence of a family of events E_i (i in any index set) is `indep_event_family`
+(the library's `indep_events_seq` is the case of the index set (:num),
+`INDEP_EVENT_FAMILY_SEQ`; equivalently the indicators are independent,
+`INDEP_EVENT_FAMILY_INDICATOR`). An event mutually independent of a family is
+`event_mutually_indep`. Unimodality about m is `unimodal_about`, Khinchin's definition:
+the CDF is convex on (-inf,m) and concave on (m,inf); an atom at m is allowed.
 
 | Entry | Theorems | Remarks |
 |---|---|---|
-| Kolmogorov | planned | |
-| VPG 1 | planned | False when the variance is 0 (a point mass); to be stated for sigma > 0. |
-| VPG 2 | planned | |
-| VPG 3 | planned | |
-| Etemadi | planned | |
-| Doob | planned | |
-| Janson | planned | |
-| Lovász 1 | planned | |
-| Lovász 2 | planned | |
+| Kolmogorov | `KOLMOGOROV_INEQUALITY`, `KOLMOGOROV_INEQUALITY_GEN` | The maximum over 1 <= k <= n; finite variance as E[X_i^2] finite; n = 0 allowed. The general form has no mean-zero hypothesis and centres the partial sums. |
+| VPG 1 | deferred | False when the variance is 0 (a point mass); the statement for sigma > 0, and its form for any centre and radius, is fixed. The known proofs use a density; this file's unimodality allows an atom at the mode. |
+| VPG 2 | `GAUSS_INEQUALITY` | Every epsilon > 0 (the sheet's epsilon >= 2 tau / sqrt 3 is not needed). |
+| VPG 3 | `GAUSS_INEQUALITY_ALT` | As printed; tau = 0 reads as the bound 1 by x/0 = 0. |
+| Etemadi | `ETEMADI_INEQUALITY` | Any real alpha; n >= 1. The maximum of the n probabilities is a `sup`. |
+| Doob | `DOOB_INEQUALITY`, `DOOB_INEQUALITY_GEN` | The maximum over 0 <= k <= n, any filtration. The general form is for a submartingale, with E[max(X_n,0)]. |
+| Janson | `JANSON_INEQUALITY`, `JANSON_INEQUALITY_GEN`, `HARRIS_INEQUALITY` | The sheet's implicit setting: a random subset R with independent memberships, B_i = {A_i SUBSET R} with A_i finite, B_i ~ B_j when A_i and A_j meet; epsilon < 1 (unprinted), Delta over ordered pairs. The general form is for increasing events determined by R on finite sets A_i; Harris's inequality (increasing events are positively correlated) is the general result. |
+| Lovász 1 | `LOVASZ_LOCAL_LEMMA` | The dependency graph as neighbourhoods N_i: B_i is mutually independent of the B_j outside N_i and i; N need not be symmetric. |
+| Lovász 2 | `LOVASZ_LOCAL_LEMMA_SYMMETRIC` | "All but at most d others" as a set of at least \|s\| - 1 - d other indices of which B_i is mutually independent; any p, d = 0 allowed. |
 
 ### Matrices (`matrix.ml`)
 

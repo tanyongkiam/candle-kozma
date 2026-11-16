@@ -7,48 +7,6 @@ needs "Multivariate/realanalysis.ml";;
 needs "kozma/means.ml";;
 
 (* ------------------------------------------------------------------------- *)
-(* A nonnegative series with bounded partial sums converges, and its sum is  *)
-(* at most the bound.                                                        *)
-(* This is REAL_SUMMABLE_POS_PARTIAL_BOUND of HOL Light's                    *)
-(* Multivariate/realanalysis.ml, which Candle's copy of that file does not   *)
-(* yet contain. Replace this local copy by the library theorem once Candle's *)
-(* library includes it.                                                      *)
-(* ------------------------------------------------------------------------- *)
-
-let REAL_SUMMABLE_POS_BOUNDED_PARTIAL_SUMS = prove
- (`!f:num->real k B.
-        (!n. k <= n ==> &0 <= f n) /\ (!n. sum(k..n) f <= B)
-        ==> real_summable (from k) f /\ real_infsum (from k) f <= B`,
-  REPEAT GEN_TAC THEN STRIP_TAC THEN
-  SUBGOAL_THEN `!n. &0 <= sum(k..n) (f:num->real)` ASSUME_TAC THENL
-   [GEN_TAC THEN MATCH_MP_TAC SUM_POS_LE_NUMSEG THEN ASM_SIMP_TAC[];
-    ALL_TAC] THEN
-  MP_TAC(ISPEC `\n. sum(k..n) (f:num->real)`
-    CONVERGENT_REAL_BOUNDED_MONOTONE) THEN
-  ANTS_TAC THENL
-   [REWRITE_TAC[REAL_BOUNDED_POS; FORALL_IN_IMAGE; IN_UNIV] THEN
-    CONJ_TAC THENL
-     [EXISTS_TAC `abs B + &1:real` THEN CONJ_TAC THENL
-       [REAL_ARITH_TAC;
-        X_GEN_TAC `n:num` THEN
-        FIRST_X_ASSUM(MP_TAC o SPEC `n:num` o check (fun th ->
-          free_in `B:real` (concl th))) THEN
-        FIRST_X_ASSUM(MP_TAC o SPEC `n:num`) THEN REAL_ARITH_TAC];
-      DISJ1_TAC THEN X_GEN_TAC `n:num` THEN
-      REWRITE_TAC[SUM_CLAUSES_NUMSEG] THEN COND_CASES_TAC THEN
-      ASM_SIMP_TAC[REAL_LE_ADDR; REAL_LE_REFL]];
-    ALL_TAC] THEN
-  DISCH_THEN(X_CHOOSE_TAC `l:real`) THEN
-  SUBGOAL_THEN `((f:num->real) real_sums l) (from k)` ASSUME_TAC THENL
-   [ASM_REWRITE_TAC[REAL_SERIES_FROM]; ALL_TAC] THEN
-  CONJ_TAC THENL [ASM_MESON_TAC[real_summable]; ALL_TAC] THEN
-  FIRST_ASSUM(SUBST1_TAC o MATCH_MP REAL_INFSUM_UNIQUE) THEN
-  MATCH_MP_TAC(ISPEC `sequentially` REALLIM_UBOUND) THEN
-  EXISTS_TAC `\n. sum(k..n) (f:num->real)` THEN
-  ASM_REWRITE_TAC[TRIVIAL_LIMIT_SEQUENTIALLY; EVENTUALLY_SEQUENTIALLY] THEN
-  MESON_TAC[]);;
-
-(* ------------------------------------------------------------------------- *)
 (* Mathieu's inequality: 1/(c^2 + 1/2) < sum_(n>=1) 2n/(n^2 + c^2)^2 < 1/c^2 *)
 (* for c <> 0, by telescoping bounds on each term.                           *)
 (* ------------------------------------------------------------------------- *)
@@ -334,23 +292,6 @@ let MATHIEU_INEQUALITY = prove
 (* iterated series.                                                          *)
 (* ------------------------------------------------------------------------- *)
 
-let ABS_MUL_LE_WEIGHTED_SQUARES = prove
- (`!p q t. &0 < t
-           ==> abs p * abs q <= t / &2 * p pow 2 + inv(&2 * t) * q pow 2`,
-  REPEAT STRIP_TAC THEN
-  SUBGOAL_THEN `(p:real) pow 2 = abs p pow 2 /\ (q:real) pow 2 = abs q pow 2`
-  (fun th -> ONCE_REWRITE_TAC[th]) THENL
-   [REWRITE_TAC[REAL_POW2_ABS]; ALL_TAC] THEN
-  SPEC_TAC(`abs(p:real)`,`P:real`) THEN SPEC_TAC(`abs(q:real)`,`Q:real`) THEN
-  REPEAT GEN_TAC THEN ONCE_REWRITE_TAC[GSYM REAL_SUB_LE] THEN
-  SUBGOAL_THEN
-   `(t / &2 * P pow 2 + inv(&2 * t) * Q pow 2) - P * Q =
-    (t * P - Q) pow 2 / (&2 * t)`
-  SUBST1_TAC THENL
-   [UNDISCH_TAC `&0 < t` THEN CONV_TAC REAL_FIELD;
-    MATCH_MP_TAC REAL_LE_DIV THEN REWRITE_TAC[REAL_LE_POW_2] THEN
-    ASM_REAL_ARITH_TAC]);;
-
 let SCHUR_TEST_FINITE = prove
  (`!K C (a:num->real) (b:num->real) m n.
      (!i j. 1 <= i /\ 1 <= j ==> &0 <= K i j) /\
@@ -366,128 +307,151 @@ let SCHUR_TEST_FINITE = prove
    [USE_THEN "row" (MP_TAC o SPECL [`1`; `0`]) THEN
     REWRITE_TAC[SUM_CLAUSES_NUMSEG; ARITH];
     ALL_TAC] THEN
-  ABBREV_TAC `A = sum(1..m) (\i. (a:num->real) i pow 2)` THEN
-  ABBREV_TAC `B = sum(1..n) (\j. (b:num->real) j pow 2)` THEN
-  SUBGOAL_THEN `&0 <= A /\ &0 <= B` STRIP_ASSUME_TAC THENL
-   [MAP_EVERY EXPAND_TAC ["A"; "B"] THEN CONJ_TAC THEN
-    MATCH_MP_TAC SUM_POS_LE_NUMSEG THEN REWRITE_TAC[REAL_LE_POW_2];
-    ALL_TAC] THEN
   SUBGOAL_THEN
-   `!t. &0 < t
-        ==> sum(1..m)
-              (\i. sum(1..n) (\j. abs((a:num->real) i * b j) * K i j)) <=
-            t / &2 * A * C + inv(&2 * t) * B * C`
-  (LABEL_TAC "key") THENL
-   [X_GEN_TAC `t:real` THEN DISCH_TAC THEN MATCH_MP_TAC REAL_LE_TRANS THEN
+   `!i N. 1 <= i
+          ==> sum(1..N) (\j. (K:num->num->real) i j * inv(sqrt(&j))) <=
+              C * inv(sqrt(&i))`
+  (LABEL_TAC "row'") THENL
+   [REPEAT STRIP_TAC THEN
+    SUBGOAL_THEN `&0 < sqrt(&i)` ASSUME_TAC THENL
+     [MATCH_MP_TAC SQRT_POS_LT THEN REWRITE_TAC[REAL_OF_NUM_LT] THEN
+      ASM_ARITH_TAC;
+      ALL_TAC] THEN
+    REMOVE_THEN "row" (MP_TAC o SPECL [`i:num`; `N:num`]) THEN
+    ASM_SIMP_TAC[SQRT_DIV; REAL_POS; real_div; GSYM REAL_MUL_ASSOC] THEN
+    ONCE_REWRITE_TAC[REAL_ARITH `(k:real) * s * t = s * (k * t)`] THEN
+    REWRITE_TAC[SUM_LMUL] THEN REWRITE_TAC[GSYM real_div] THEN
+    ASM_SIMP_TAC[REAL_LE_RDIV_EQ] THEN REAL_ARITH_TAC;
+    ALL_TAC] THEN
+  MP_TAC(ISPECL [`K:num->num->real`; `\i:num. inv(sqrt(&i))`;
+                 `\j:num. inv(sqrt(&j))`; `1..m`; `1..n`; `C:real`; `C:real`;
+                 `a:num->real`; `b:num->real`] SCHUR_TEST) THEN
+  REWRITE_TAC[FINITE_NUMSEG; IN_NUMSEG; GSYM REAL_POW_2] THEN
+  ASM_SIMP_TAC[POW_2_SQRT] THEN DISCH_THEN MATCH_MP_TAC THEN
+  REPEAT CONJ_TAC THEN REPEAT STRIP_TAC THENL
+   [REWRITE_TAC[REAL_LT_INV_EQ] THEN MATCH_MP_TAC SQRT_POS_LT THEN
+    REWRITE_TAC[REAL_OF_NUM_LT] THEN ASM_ARITH_TAC;
+    REWRITE_TAC[REAL_LT_INV_EQ] THEN MATCH_MP_TAC SQRT_POS_LT THEN
+    REWRITE_TAC[REAL_OF_NUM_LT] THEN ASM_ARITH_TAC;
+    TRANS_TAC REAL_LE_TRANS
+     `sum(1..m) (\i. (K:num->num->real) j i * inv(sqrt(&i)))` THEN
+    CONJ_TAC THENL
+     [MATCH_MP_TAC REAL_EQ_IMP_LE THEN MATCH_MP_TAC SUM_EQ_NUMSEG THEN
+      REPEAT STRIP_TAC THEN REWRITE_TAC[] THEN AP_THM_TAC THEN AP_TERM_TAC THEN
+      USE_THEN "ksym" MATCH_MP_TAC THEN ASM_REWRITE_TAC[];
+      USE_THEN "row'" MATCH_MP_TAC THEN ASM_REWRITE_TAC[]]]);;
+
+(* ------------------------------------------------------------------------- *)
+(* Tonelli for nonnegative double series: if all rectangular partial sums    *)
+(* are bounded by B, every row and column is summable, both iterated series  *)
+(* converge, they have the same sum, and that sum is at most B.              *)
+(* ------------------------------------------------------------------------- *)
+
+let REAL_SERIES_TONELLI = prove
+ (`!(f:num->num->real) k l B.
+     (!i j. k <= i /\ l <= j ==> &0 <= f i j) /\
+     (!m n. sum(k..m) (\i. sum(l..n) (\j. f i j)) <= B)
+     ==> (!i. k <= i ==> real_summable (from l) (\j. f i j)) /\
+         (!j. l <= j ==> real_summable (from k) (\i. f i j)) /\
+         real_summable (from k) (\i. real_infsum (from l) (\j. f i j)) /\
+         real_summable (from l) (\j. real_infsum (from k) (\i. f i j)) /\
+         real_infsum (from l) (\j. real_infsum (from k) (\i. f i j)) =
+         real_infsum (from k) (\i. real_infsum (from l) (\j. f i j)) /\
+         real_infsum (from k) (\i. real_infsum (from l) (\j. f i j)) <= B`,
+  SUBGOAL_THEN
+   `!(g:num->num->real) k l B.
+      (!i j. k <= i /\ l <= j ==> &0 <= g i j) /\
+      (!m n. sum(k..m) (\i. sum(l..n) (\j. g i j)) <= B)
+      ==> (!i. k <= i ==> real_summable (from l) (\j. g i j)) /\
+          real_summable (from k) (\i. real_infsum (from l) (\j. g i j)) /\
+          real_infsum (from k) (\i. real_infsum (from l) (\j. g i j)) <= B`
+  MP_TAC THENL
+   [REPEAT GEN_TAC THEN STRIP_TAC THEN
+    SUBGOAL_THEN
+     `!i. k <= i ==> real_summable (from l) (\j. (g:num->num->real) i j) /\
+                     real_infsum (from l) (\j. g i j) <= B`
+    ASSUME_TAC THENL
+     [X_GEN_TAC `i:num` THEN DISCH_TAC THEN
+      MATCH_MP_TAC REAL_SUMMABLE_POS_BOUNDED_PARTIAL_SUMS THEN
+      ASM_SIMP_TAC[] THEN X_GEN_TAC `n:num` THEN
+      TRANS_TAC REAL_LE_TRANS
+       `sum(k..i) (\i'. sum(l..n) (\j. (g:num->num->real) i' j))` THEN
+      ASM_REWRITE_TAC[] THEN
+      MP_TAC(ISPECL [`{i:num}`; `k..i`;
+                     `\i'. sum(l..n) (\j. (g:num->num->real) i' j)`]
+                    SUM_SUBSET_SIMPLE) THEN
+      REWRITE_TAC[SUM_SING; FINITE_NUMSEG; SING_SUBSET; IN_NUMSEG; IN_DIFF;
+                  IN_SING; ETA_AX] THEN
+      DISCH_THEN MATCH_MP_TAC THEN CONJ_TAC THENL [ASM_ARITH_TAC; ALL_TAC] THEN
+      REPEAT STRIP_TAC THEN MATCH_MP_TAC SUM_POS_LE_NUMSEG THEN
+      REPEAT STRIP_TAC THEN FIRST_X_ASSUM MATCH_MP_TAC THEN ASM_REWRITE_TAC[];
+      ASM_SIMP_TAC[]] THEN
+    MATCH_MP_TAC REAL_SUMMABLE_POS_BOUNDED_PARTIAL_SUMS THEN CONJ_TAC THENL
+     [REPEAT STRIP_TAC THEN MATCH_MP_TAC REAL_SERIES_POS THEN
+      MAP_EVERY EXISTS_TAC [`\j. (g:num->num->real) n j`; `from l`] THEN
+      ASM_SIMP_TAC[REAL_SUMS_INFSUM; IN_FROM];
+      ALL_TAC] THEN
+    X_GEN_TAC `m:num` THEN
+    MATCH_MP_TAC(ISPEC `sequentially` REALLIM_UBOUND) THEN
     EXISTS_TAC
-     `sum(1..m) (\i. sum(1..n) (\j.
-        t / &2 * ((a:num->real) i pow 2 * (K i j * sqrt(&i / &j))) +
-        inv(&2 * t) * ((b:num->real) j pow 2 * (K j i * sqrt(&j / &i)))))` THEN
-    CONJ_TAC THENL
-     [MATCH_MP_TAC SUM_LE_NUMSEG THEN X_GEN_TAC `i:num` THEN STRIP_TAC THEN
-      REWRITE_TAC[] THEN MATCH_MP_TAC SUM_LE_NUMSEG THEN
-      X_GEN_TAC `j:num` THEN STRIP_TAC THEN REWRITE_TAC[] THEN
-      SUBGOAL_THEN
-       `&0 < sqrt(&i / &j) /\ inv(sqrt(&i / &j)) = sqrt(&j / &i)`
-      STRIP_ASSUME_TAC THENL
-       [CONJ_TAC THENL
-         [MATCH_MP_TAC SQRT_POS_LT THEN MATCH_MP_TAC REAL_LT_DIV THEN
-          REWRITE_TAC[REAL_OF_NUM_LT] THEN ASM_ARITH_TAC;
-          REWRITE_TAC[GSYM SQRT_INV; REAL_INV_DIV]];
-        ALL_TAC] THEN
-      SUBGOAL_THEN
-       `abs((a:num->real) i) * abs((b:num->real) j) <=
-        t / &2 * a i pow 2 * sqrt(&i / &j) +
-        inv(&2 * t) * b j pow 2 * sqrt(&j / &i)`
-      ASSUME_TAC THENL
-       [UNDISCH_TAC `inv(sqrt(&i / &j)) = sqrt(&j / &i)` THEN
-        DISCH_THEN(SUBST1_TAC o SYM) THEN
-        MP_TAC(ISPECL [`(a:num->real) i`; `(b:num->real) j`;
-                       `t * sqrt(&i / &j)`] ABS_MUL_LE_WEIGHTED_SQUARES) THEN
-        ANTS_TAC THENL [ASM_SIMP_TAC[REAL_LT_MUL]; ALL_TAC] THEN
-        MATCH_MP_TAC
-         (REAL_ARITH `!x y z:real. y = z ==> x <= y ==> x <= z`) THEN
-        MAP_EVERY UNDISCH_TAC [`&0 < t`; `&0 < sqrt(&i / &j)`] THEN
-        CONV_TAC REAL_FIELD;
-        ALL_TAC] THEN
-      REWRITE_TAC[REAL_ABS_MUL] THEN
-      USE_THEN "ksym" (MP_TAC o SPECL [`j:num`; `i:num`]) THEN
-      ANTS_TAC THENL [ASM_REWRITE_TAC[]; DISCH_THEN SUBST1_TAC] THEN
-      USE_THEN "kpos" (MP_TAC o SPECL [`i:num`; `j:num`]) THEN
-      ANTS_TAC THENL [ASM_REWRITE_TAC[]; DISCH_TAC] THEN
-      FIRST_X_ASSUM(MP_TAC o MATCH_MP REAL_LE_RMUL o
-        C CONJ (ASSUME `&0 <= (K:num->num->real) i j`) o
-        check (fun th ->
-          can (find_term ((=) `abs:real->real`)) (concl th))) THEN
-      REAL_ARITH_TAC;
-      ALL_TAC] THEN
-    REWRITE_TAC[SUM_ADD_NUMSEG; SUM_LMUL] THEN MATCH_MP_TAC REAL_LE_ADD2 THEN
-    CONJ_TAC THEN MATCH_MP_TAC REAL_LE_LMUL THEN CONJ_TAC THEN
-    TRY(MATCH_MP_TAC REAL_LT_IMP_LE THEN
-        ASM_SIMP_TAC[REAL_LT_INV_EQ; REAL_LT_DIV; REAL_LT_MUL; REAL_OF_NUM_LT;
-                     ARITH] THEN
-        NO_TAC) THENL
-     [EXPAND_TAC "A" THEN REWRITE_TAC[GSYM SUM_RMUL] THEN
-      MATCH_MP_TAC SUM_LE_NUMSEG THEN X_GEN_TAC `i:num` THEN STRIP_TAC THEN
-      REWRITE_TAC[] THEN MATCH_MP_TAC REAL_LE_LMUL THEN
-      REWRITE_TAC[REAL_LE_POW_2] THEN USE_THEN "row" MATCH_MP_TAC THEN
+     `\n. sum(k..m) (\i. sum(l..n) (\j. (g:num->num->real) i j))` THEN
+    ASM_REWRITE_TAC[TRIVIAL_LIMIT_SEQUENTIALLY; EVENTUALLY_SEQUENTIALLY] THEN
+    MP_TAC(ISPECL [`sequentially`;
+                   `\i n. sum(l..n) (\j. (g:num->num->real) i j)`;
+                   `\i. real_infsum (from l) (\j. (g:num->num->real) i j)`;
+                   `k..m`] REALLIM_SUM) THEN
+    REWRITE_TAC[FINITE_NUMSEG; ETA_AX] THEN DISCH_THEN MATCH_MP_TAC THEN
+    REWRITE_TAC[IN_NUMSEG] THEN REPEAT STRIP_TAC THEN
+    REWRITE_TAC[GSYM REAL_SERIES_FROM; REAL_SUMS_INFSUM] THEN
+    ASM_SIMP_TAC[] THEN RULE_ASSUM_TAC(REWRITE_RULE[ETA_AX]) THEN
+    ASM_SIMP_TAC[];
+    ALL_TAC] THEN
+  DISCH_THEN(fun one ->
+    REPEAT GEN_TAC THEN STRIP_TAC THEN
+    MP_TAC(ISPECL [`f:num->num->real`; `k:num`; `l:num`; `B:real`] one) THEN
+    MP_TAC(ISPECL [`\j i. (f:num->num->real) i j`; `l:num`; `k:num`; `B:real`]
+                  one) THEN
+    ASM_SIMP_TAC[] THEN ANTS_TAC THENL
+     [GEN_TAC THEN GEN_TAC THEN ONCE_REWRITE_TAC[SUM_SWAP_NUMSEG] THEN
       ASM_REWRITE_TAC[];
-      GEN_REWRITE_TAC LAND_CONV [SUM_SWAP_NUMSEG] THEN
-      REWRITE_TAC[SUM_LMUL] THEN
-      EXPAND_TAC "B" THEN REWRITE_TAC[GSYM SUM_RMUL] THEN
-      MATCH_MP_TAC SUM_LE_NUMSEG THEN X_GEN_TAC `j:num` THEN STRIP_TAC THEN
-      REWRITE_TAC[] THEN MATCH_MP_TAC REAL_LE_LMUL THEN
-      REWRITE_TAC[REAL_LE_POW_2] THEN USE_THEN "row" MATCH_MP_TAC THEN
-      ASM_REWRITE_TAC[]];
-    ALL_TAC] THEN
-  ASM_CASES_TAC `A = &0` THENL
-   [SUBGOAL_THEN `!i. 1 <= i /\ i <= m ==> (a:num->real) i = &0`
-    ASSUME_TAC THENL
-     [REPEAT STRIP_TAC THEN
-      SUBGOAL_THEN `(a:num->real) i pow 2 = &0` MP_TAC THENL
-       [MP_TAC(ISPECL [`\i. (a:num->real) i pow 2`; `1`; `m:num`]
-                      SUM_POS_EQ_0_NUMSEG) THEN
-        ASM_REWRITE_TAC[REAL_LE_POW_2] THEN
-        DISCH_THEN(MP_TAC o SPEC `i:num`) THEN ASM_REWRITE_TAC[];
-        REWRITE_TAC[REAL_POW_EQ_0] THEN ARITH_TAC];
+      REPEAT STRIP_TAC] THEN
+    ASM_REWRITE_TAC[] THENL [ASM_SIMP_TAC[]; ALL_TAC] THEN
+    SUBGOAL_THEN
+     `(!i. k <= i
+           ==> &0 <= real_infsum (from l) (\j. (f:num->num->real) i j)) /\
+      (!j. l <= j
+           ==> &0 <= real_infsum (from k) (\i. (f:num->num->real) i j))`
+    STRIP_ASSUME_TAC THENL
+     [CONJ_TAC THEN REPEAT STRIP_TAC THEN MATCH_MP_TAC REAL_SERIES_POS THENL
+       [MAP_EVERY EXISTS_TAC [`\j. (f:num->num->real) i j`; `from l`];
+        MAP_EVERY EXISTS_TAC [`\i. (f:num->num->real) i j`; `from k`]] THEN
+      ASM_SIMP_TAC[REAL_SUMS_INFSUM; IN_FROM];
       ALL_TAC] THEN
-    MATCH_MP_TAC(REAL_ARITH `x = &0 /\ &0 <= y ==> x <= y`) THEN
-    CONJ_TAC THENL
-     [MATCH_MP_TAC SUM_EQ_0_NUMSEG THEN REPEAT STRIP_TAC THEN
-      REWRITE_TAC[] THEN MATCH_MP_TAC SUM_EQ_0_NUMSEG THEN
-      ASM_SIMP_TAC[REAL_MUL_LZERO; REAL_ABS_0];
-      REPEAT(MATCH_MP_TAC REAL_LE_MUL THEN CONJ_TAC) THEN
-      ASM_SIMP_TAC[SQRT_POS_LE]];
-    ALL_TAC] THEN
-  ASM_CASES_TAC `B = &0` THENL
-   [SUBGOAL_THEN `!j. 1 <= j /\ j <= n ==> (b:num->real) j = &0`
-    ASSUME_TAC THENL
-     [REPEAT STRIP_TAC THEN
-      SUBGOAL_THEN `(b:num->real) j pow 2 = &0` MP_TAC THENL
-       [MP_TAC(ISPECL [`\j. (b:num->real) j pow 2`; `1`; `n:num`]
-                      SUM_POS_EQ_0_NUMSEG) THEN
-        ASM_REWRITE_TAC[REAL_LE_POW_2] THEN
-        DISCH_THEN(MP_TAC o SPEC `j:num`) THEN ASM_REWRITE_TAC[];
-        REWRITE_TAC[REAL_POW_EQ_0] THEN ARITH_TAC];
-      ALL_TAC] THEN
-    MATCH_MP_TAC(REAL_ARITH `x = &0 /\ &0 <= y ==> x <= y`) THEN
-    CONJ_TAC THENL
-     [MATCH_MP_TAC SUM_EQ_0_NUMSEG THEN REPEAT STRIP_TAC THEN
-      REWRITE_TAC[] THEN MATCH_MP_TAC SUM_EQ_0_NUMSEG THEN
-      ASM_SIMP_TAC[REAL_MUL_RZERO; REAL_ABS_0; REAL_MUL_LZERO];
-      REPEAT(MATCH_MP_TAC REAL_LE_MUL THEN CONJ_TAC) THEN
-      ASM_SIMP_TAC[SQRT_POS_LE]];
-    ALL_TAC] THEN
-  SUBGOAL_THEN
-   `&0 < sqrt A /\ &0 < sqrt B /\ sqrt A pow 2 = A /\ sqrt B pow 2 = B`
-  STRIP_ASSUME_TAC THENL
-   [ASM_SIMP_TAC[SQRT_POW_2; SQRT_POS_LT; REAL_LT_LE]; ALL_TAC] THEN
-  USE_THEN "key" (MP_TAC o SPEC `sqrt B / sqrt A`) THEN
-  ANTS_TAC THENL [ASM_SIMP_TAC[REAL_LT_DIV]; ALL_TAC] THEN
-  MATCH_MP_TAC(REAL_ARITH `!x y z:real. y = z ==> x <= y ==> x <= z`) THEN
-  MAP_EVERY UNDISCH_TAC
-   [`&0 < sqrt A`; `&0 < sqrt B`; `sqrt A pow 2 = A`; `sqrt B pow 2 = B`] THEN
-  CONV_TAC REAL_FIELD);;
+    ONCE_REWRITE_TAC[GSYM REAL_LE_ANTISYM] THEN CONJ_TAC THENL
+     [MP_TAC(ISPECL [`\j i. (f:num->num->real) i j`; `l:num`; `k:num`;
+                     `real_infsum (from k)
+                        (\i. real_infsum (from l)
+                               (\j. (f:num->num->real) i j))`]
+                    one);
+      MP_TAC(ISPECL [`f:num->num->real`; `k:num`; `l:num`;
+                     `real_infsum (from l)
+                        (\j. real_infsum (from k)
+                               (\i. (f:num->num->real) i j))`]
+                    one)] THEN
+    REWRITE_TAC[] THEN (ANTS_TAC THENL [ALL_TAC; SIMP_TAC[]]) THEN
+    CONJ_TAC THEN TRY(ASM_SIMP_TAC[] THEN NO_TAC) THEN
+    REPEAT GEN_TAC THEN ONCE_REWRITE_TAC[SUM_SWAP_NUMSEG] THENL
+     [TRANS_TAC REAL_LE_TRANS
+       `sum(k..n) (\i. real_infsum (from l)
+                         (\j. (f:num->num->real) i j))`;
+      TRANS_TAC REAL_LE_TRANS
+       `sum(l..n) (\j. real_infsum (from k)
+                         (\i. (f:num->num->real) i j))`] THEN
+    (CONJ_TAC THENL
+      [MATCH_MP_TAC SUM_LE_NUMSEG THEN REPEAT STRIP_TAC THEN REWRITE_TAC[];
+       ALL_TAC] THEN
+     MATCH_MP_TAC REAL_PARTIAL_SUMS_LE_INFSUM_GEN THEN
+     ASM_SIMP_TAC[FINITE_NUMSEG; SUBSET; IN_NUMSEG; IN_FROM])));;
 
 let ITERATED_SERIES_BOUND = prove
  (`!K C (a:num->real) (b:num->real).
@@ -604,31 +568,15 @@ let ITERATED_SERIES_BOUND = prove
         REWRITE_TAC[REAL_LE_POW_2] THEN NO_TAC) THEN
     MATCH_MP_TAC SQRT_MONO_LE THEN ASM_SIMP_TAC[];
     ALL_TAC] THEN
-  SUBGOAL_THEN
-   `!i. 1 <= i
-        ==> real_summable (from 1) (\j. abs((a:num->real) i * b j) * K i j) /\
-            real_infsum (from 1) (\j. abs(a i * b j) * K i j) <= M`
-  (LABEL_TAC "Q") THENL
-   [GEN_TAC THEN DISCH_TAC THEN
-    MATCH_MP_TAC REAL_SUMMABLE_POS_BOUNDED_PARTIAL_SUMS THEN
-    CONJ_TAC THENL
-     [REPEAT STRIP_TAC THEN REWRITE_TAC[] THEN MATCH_MP_TAC REAL_LE_MUL THEN
+  MP_TAC(ISPECL
+   [`\i j. abs((a:num->real) i * (b:num->real) j) * (K:num->num->real) i j`;
+    `1`; `1`; `M:real`] REAL_SERIES_TONELLI) THEN
+  REWRITE_TAC[] THEN ANTS_TAC THENL
+   [CONJ_TAC THENL
+     [REPEAT STRIP_TAC THEN MATCH_MP_TAC REAL_LE_MUL THEN
       ASM_SIMP_TAC[REAL_ABS_POS];
-      ALL_TAC] THEN
-    X_GEN_TAC `n:num` THEN MATCH_MP_TAC REAL_LE_TRANS THEN
-    EXISTS_TAC
-     `sum(1..i) (\k. sum(1..n) (\j. abs((a:num->real) k * b j) * K k j))` THEN
-    USE_THEN "P" (fun th -> REWRITE_TAC[th]) THEN
-    MP_TAC(ISPECL [`{i:num}`; `1..i`;
-                   `\k. sum(1..n) (\j. abs((a:num->real) k * b j) * K k j)`]
-                  SUM_SUBSET_SIMPLE) THEN
-    REWRITE_TAC[SUM_SING; FINITE_NUMSEG; SING_SUBSET; IN_NUMSEG; IN_DIFF;
-                IN_SING] THEN
-    DISCH_THEN MATCH_MP_TAC THEN CONJ_TAC THENL [ASM_ARITH_TAC; ALL_TAC] THEN
-    REPEAT STRIP_TAC THEN MATCH_MP_TAC SUM_POS_LE_NUMSEG THEN
-    REPEAT STRIP_TAC THEN REWRITE_TAC[] THEN MATCH_MP_TAC REAL_LE_MUL THEN
-    ASM_SIMP_TAC[REAL_ABS_POS];
-    ALL_TAC] THEN
+      USE_THEN "P" (fun th -> REWRITE_TAC[th])];
+    STRIP_TAC] THEN
   SUBGOAL_THEN
    `!i j. 1 <= i /\ 1 <= j
           ==> abs((a:num->real) i * (b:num->real) j * K i j) =
@@ -688,34 +636,12 @@ let ITERATED_SERIES_BOUND = prove
       ASM_SIMP_TAC[REAL_SERIES_NEG; IN_FROM] THEN
       ASM_MESON_TAC[REAL_ARITH `!x:real. --abs x <= x`]];
     ALL_TAC] THEN
-  MP_TAC(ISPECL [`y:num->real`; `1`; `M:real`]
-                REAL_SUMMABLE_POS_BOUNDED_PARTIAL_SUMS) THEN
-  ANTS_TAC THENL
-   [CONJ_TAC THENL
-     [X_GEN_TAC `n:num` THEN DISCH_TAC THEN
-      USE_THEN "R" (MP_TAC o C MP (ASSUME `1 <= n`) o SPEC `n:num`) THEN
-      REAL_ARITH_TAC;
-      ALL_TAC] THEN
-    X_GEN_TAC `m:num` THEN
-    MATCH_MP_TAC(ISPEC `sequentially` REALLIM_UBOUND) THEN
-    EXISTS_TAC
-     `\n. sum(1..m)
-            (\i. sum(1..n)
-                   (\j. abs((a:num->real) i * (b:num->real) j) *
-                        (K:num->num->real) i j))` THEN
-    REWRITE_TAC[TRIVIAL_LIMIT_SEQUENTIALLY; EVENTUALLY_SEQUENTIALLY] THEN
-    USE_THEN "P" (fun th -> REWRITE_TAC[th]) THEN
-    MP_TAC(ISPECL
-     [`sequentially`;
-      `\i n. sum(1..n) (\j. abs((a:num->real) i * (b:num->real) j) *
-                            (K:num->num->real) i j)`;
-      `y:num->real`; `1..m`] REALLIM_SUM) THEN
-    REWRITE_TAC[FINITE_NUMSEG; ETA_AX] THEN DISCH_THEN MATCH_MP_TAC THEN
-    REWRITE_TAC[IN_NUMSEG] THEN REPEAT STRIP_TAC THEN
-    REWRITE_TAC[GSYM REAL_SERIES_FROM] THEN
-    USE_THEN "S" (MP_TAC o SPEC `i:num`) THEN ASM_SIMP_TAC[ETA_AX];
+  SUBGOAL_THEN
+   `real_summable (from 1) (y:num->real) /\ real_infsum (from 1) y <= M`
+  STRIP_ASSUME_TAC THENL
+   [(ASM_REWRITE_TAC[] THEN NO_TAC) ORELSE
+    (EXPAND_TAC "y" THEN ASM_REWRITE_TAC[]);
     ALL_TAC] THEN
-  STRIP_TAC THEN
   SUBGOAL_THEN `real_summable (from 1) (x:num->real)` ASSUME_TAC THENL
    [MATCH_MP_TAC REAL_SUMMABLE_COMPARISON THEN EXISTS_TAC `y:num->real` THEN
     ASM_REWRITE_TAC[] THEN EXISTS_TAC `1` THEN REWRITE_TAC[IN_FROM] THEN
@@ -733,107 +659,86 @@ let SQUARE_SUMMABLE_DIV_SUMMABLE = prove
  (`!b:num->real. real_summable (from 1) (\j. b j pow 2)
                  ==> real_summable (from 1) (\j. b j / &j)`,
   REPEAT STRIP_TAC THEN MATCH_MP_TAC REAL_SUMMABLE_COMPARISON THEN
-  EXISTS_TAC `\j. (b:num->real) j pow 2 + inv(&j rpow &2)` THEN CONJ_TAC THENL
-   [MATCH_MP_TAC REAL_SUMMABLE_ADD THEN ASM_REWRITE_TAC[] THEN
+  EXISTS_TAC `\j. abs((b:num->real) j * inv(&j))` THEN CONJ_TAC THENL
+   [MATCH_MP_TAC REAL_SUMMABLE_ABS_MUL_SQUARES THEN ASM_REWRITE_TAC[] THEN
+    REWRITE_TAC[REAL_POW_INV; GSYM RPOW_POW] THEN
     MATCH_MP_TAC REAL_SUMMABLE_ZETA THEN REAL_ARITH_TAC;
-    ALL_TAC] THEN
-  EXISTS_TAC `1` THEN X_GEN_TAC `j:num` THEN
-  REWRITE_TAC[IN_FROM; RPOW_POW; real_div; GSYM REAL_POW_INV] THEN
-  DISCH_TAC THEN
-  SPEC_TAC(`inv(&j)`,`y:real`) THEN SPEC_TAC(`(b:num->real) j`,`x:real`) THEN
-  REPEAT GEN_TAC THEN
-  MP_TAC(SPEC `x - y:real` REAL_LE_POW_2) THEN
-  MP_TAC(SPEC `x + y:real` REAL_LE_POW_2) THEN
-  MP_TAC(SPEC `x:real` REAL_LE_POW_2) THEN
-  MP_TAC(SPEC `y:real` REAL_LE_POW_2) THEN
-  REAL_ARITH_TAC);;
+    EXISTS_TAC `1` THEN REWRITE_TAC[real_div; REAL_LE_REFL]]);;
 
 (* ------------------------------------------------------------------------- *)
 (* Hilbert's inequality with kernel 1/max(i,j) and constant 4: the weight    *)
-(* sums are at most 2 + 2, by telescoping.                                   *)
+(* sums are at most 2 + 2, by comparison with the integrals of x^(-1/2) and  *)
+(* x^(-3/2).                                                                 *)
 (* ------------------------------------------------------------------------- *)
-
-let INV_SQRT_LE_DIFF = prove
- (`!j. 1 <= j ==> inv(sqrt(&j)) <= &2 * (sqrt(&j) - sqrt(&(j - 1)))`,
-  REPEAT STRIP_TAC THEN SUBGOAL_THEN `&(j - 1) = &j - &1` SUBST1_TAC THENL
-   [ASM_SIMP_TAC[REAL_OF_NUM_SUB]; ALL_TAC] THEN
-  SUBGOAL_THEN `&1 <= &j` MP_TAC THENL
-   [ASM_REWRITE_TAC[REAL_OF_NUM_LE]; ALL_TAC] THEN
-  SPEC_TAC(`&j`,`x:real`) THEN GEN_TAC THEN DISCH_TAC THEN
-  SUBGOAL_THEN
-   `&0 < sqrt x /\ &0 <= sqrt(x - &1) /\ sqrt x pow 2 = x /\
-    sqrt(x - &1) pow 2 = x - &1`
-  STRIP_ASSUME_TAC THENL
-   [REPEAT CONJ_TAC THEN
-    TRY(MATCH_MP_TAC SQRT_POW_2 THEN ASM_REAL_ARITH_TAC) THEN
-    TRY(MATCH_MP_TAC SQRT_POS_LT THEN ASM_REAL_ARITH_TAC) THEN
-    MATCH_MP_TAC SQRT_POS_LE THEN ASM_REAL_ARITH_TAC;
-    ALL_TAC] THEN
-  ABBREV_TAC `u = sqrt x` THEN ABBREV_TAC `v = sqrt(x - &1)` THEN
-  GEN_REWRITE_TAC LAND_CONV [GSYM REAL_MUL_LID] THEN
-  REWRITE_TAC[GSYM real_div] THEN ASM_SIMP_TAC[REAL_LE_LDIV_EQ] THEN
-  MP_TAC(SPEC `u - v:real` REAL_LE_POW_2) THEN ASM_REAL_ARITH_TAC);;
-
-let INV_MUL_SQRT_LE_DIFF = prove
- (`!j. 2 <= j
-       ==> inv(&j * sqrt(&j)) <=
-           &2 * (inv(sqrt(&(j - 1))) - inv(sqrt(&j)))`,
-  REPEAT STRIP_TAC THEN SUBGOAL_THEN `&(j - 1) = &j - &1` SUBST1_TAC THENL
-   [ASM_SIMP_TAC[REAL_OF_NUM_SUB; ARITH_RULE `2 <= j ==> 1 <= j`];
-    ALL_TAC] THEN
-  SUBGOAL_THEN `&2 <= &j` MP_TAC THENL
-   [ASM_REWRITE_TAC[REAL_OF_NUM_LE]; ALL_TAC] THEN
-  SPEC_TAC(`&j`,`x:real`) THEN GEN_TAC THEN DISCH_TAC THEN
-  SUBGOAL_THEN
-   `&0 < sqrt x /\ &0 < sqrt(x - &1) /\ sqrt x pow 2 = x /\
-    sqrt(x - &1) pow 2 = x - &1`
-  STRIP_ASSUME_TAC THENL
-   [REPEAT CONJ_TAC THEN
-    TRY(MATCH_MP_TAC SQRT_POW_2 THEN ASM_REAL_ARITH_TAC) THEN
-    MATCH_MP_TAC SQRT_POS_LT THEN ASM_REAL_ARITH_TAC;
-    ALL_TAC] THEN
-  SUBGOAL_THEN `sqrt(x - &1) <= sqrt x` ASSUME_TAC THENL
-   [MATCH_MP_TAC SQRT_MONO_LE THEN REAL_ARITH_TAC; ALL_TAC] THEN
-  ABBREV_TAC `u = sqrt x` THEN ABBREV_TAC `v = sqrt(x - &1)` THEN
-  SUBGOAL_THEN `(x:real) = u pow 2` SUBST1_TAC THENL
-   [ASM_REWRITE_TAC[]; ALL_TAC] THEN
-  ONCE_REWRITE_TAC[GSYM REAL_SUB_LE] THEN
-  SUBGOAL_THEN
-   `&2 * (inv v - inv u) - inv(u pow 2 * u) =
-    (u - v) * (&2 * u + v) / (u + v) / (u pow 3 * v)`
-  SUBST1_TAC THENL
-   [MAP_EVERY UNDISCH_TAC
-     [`&0 < u`; `&0 < v`; `(v:real) pow 2 = x - &1`; `(u:real) pow 2 = x`] THEN
-    CONV_TAC REAL_FIELD;
-    ALL_TAC] THEN
-  REPEAT((MATCH_MP_TAC REAL_LE_MUL ORELSE MATCH_MP_TAC REAL_LE_DIV) THEN
-         CONJ_TAC) THEN
-  TRY(MATCH_MP_TAC REAL_POW_LE) THEN ASM_REAL_ARITH_TAC);;
 
 let SUM_INV_SQRT_LE = prove
  (`!n. sum(1..n) (\j. inv(sqrt(&j))) <= &2 * sqrt(&n)`,
-  INDUCT_TAC THEN
-  REWRITE_TAC[SUM_CLAUSES_NUMSEG; ARITH_RULE `1 <= SUC n`] THENL
-   [REWRITE_TAC[ARITH; SQRT_0] THEN REAL_ARITH_TAC; ALL_TAC] THEN
-  MP_TAC(SPEC `SUC n` INV_SQRT_LE_DIFF) THEN
-  REWRITE_TAC[ARITH_RULE `1 <= SUC n /\ SUC n - 1 = n`] THEN
-  ASM_REAL_ARITH_TAC);;
+  GEN_TAC THEN ASM_CASES_TAC `n = 0` THENL
+   [ASM_REWRITE_TAC[SUM_CLAUSES_NUMSEG; ARITH; SQRT_0] THEN REAL_ARITH_TAC;
+    ALL_TAC] THEN
+  ASM_SIMP_TAC[SUM_CLAUSES_LEFT; ARITH_RULE `~(n = 0) ==> 1 <= n`] THEN
+  REWRITE_TAC[SQRT_1; REAL_INV_1] THEN
+  ASM_CASES_TAC `n = 1` THENL
+   [ASM_REWRITE_TAC[SQRT_1] THEN CONV_TAC NUM_REDUCE_CONV THEN
+    SIMP_TAC[SUM_TRIV_NUMSEG; ARITH] THEN REAL_ARITH_TAC;
+    ALL_TAC] THEN
+  MP_TAC(ISPECL [`\x. inv(sqrt x)`; `\x. &2 * sqrt x`; `2`; `n:num`]
+                REAL_SUM_INTEGRAL_UBOUND_DECREASING) THEN
+  CONV_TAC(ONCE_DEPTH_CONV NUM_REDUCE_CONV) THEN
+  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
+  REWRITE_TAC[IN_REAL_INTERVAL; SQRT_1] THEN ANTS_TAC THENL
+   [REPEAT CONJ_TAC THENL
+     [ASM_ARITH_TAC;
+      REPEAT STRIP_TAC THEN MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN
+      REAL_DIFF_TAC THEN
+      CONJ_TAC THENL [ASM_REAL_ARITH_TAC; REWRITE_TAC[REAL_INV_MUL]] THEN
+      REAL_ARITH_TAC;
+      REPEAT STRIP_TAC THEN MATCH_MP_TAC REAL_LE_INV2 THEN CONJ_TAC THENL
+       [MATCH_MP_TAC SQRT_POS_LT THEN ASM_REAL_ARITH_TAC;
+        MATCH_MP_TAC SQRT_MONO_LE THEN ASM_REAL_ARITH_TAC]];
+    DISCH_TAC THEN
+    MATCH_MP_TAC(REAL_ARITH `!s a. s <= a - &2 * &1 ==> &1 + s <= a`) THEN
+    FIRST_X_ASSUM ACCEPT_TAC]);;
 
 let SUM_INV_MUL_SQRT_LE = prove
  (`!m d. 1 <= m
          ==> sum(m + 1..m + d) (\j. inv(&j * sqrt(&j))) <=
              &2 * (inv(sqrt(&m)) - inv(sqrt(&(m + d))))`,
-  GEN_TAC THEN INDUCT_TAC THEN DISCH_TAC THENL
-   [REWRITE_TAC[ADD_CLAUSES] THEN
-    ASM_SIMP_TAC[SUM_TRIV_NUMSEG; ARITH_RULE `m < m + 1`] THEN REAL_ARITH_TAC;
+  REPEAT STRIP_TAC THEN ASM_CASES_TAC `d = 0` THENL
+   [ASM_SIMP_TAC[ADD_CLAUSES; SUM_TRIV_NUMSEG; ARITH_RULE `m < m + 1`] THEN
+    REAL_ARITH_TAC;
     ALL_TAC] THEN
-  ASM_SIMP_TAC[SUM_CLAUSES_NUMSEG; ARITH_RULE `m + 1 <= SUC(m + d)`;
-               ADD_CLAUSES] THEN
-  FIRST_X_ASSUM(MP_TAC o check (is_imp o concl)) THEN ASM_REWRITE_TAC[] THEN
-  MP_TAC(SPEC `SUC(m + d)` INV_MUL_SQRT_LE_DIFF) THEN
-  ASM_SIMP_TAC[ARITH_RULE `1 <= m ==> 2 <= SUC(m + d)`;
-               ARITH_RULE `SUC(m + d) - 1 = m + d`] THEN
-  REAL_ARITH_TAC);;
+  MP_TAC(ISPECL [`\x. inv(x * sqrt x)`; `\x. --(&2 * inv(sqrt x))`;
+                 `m + 1`; `m + d:num`]
+                REAL_SUM_INTEGRAL_UBOUND_DECREASING) THEN
+  REWRITE_TAC[GSYM REAL_OF_NUM_ADD; REAL_ARITH `(m + &1) - &1 = m`;
+              IN_REAL_INTERVAL] THEN
+  SUBGOAL_THEN `&1 <= &m` ASSUME_TAC THENL
+   [ASM_REWRITE_TAC[REAL_OF_NUM_LE]; ALL_TAC] THEN
+  ANTS_TAC THENL
+   [REPEAT CONJ_TAC THENL
+     [ASM_ARITH_TAC;
+      REPEAT STRIP_TAC THEN MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN
+      REAL_DIFF_TAC THEN
+      SUBGOAL_THEN `&0 < x` ASSUME_TAC THENL [ASM_REAL_ARITH_TAC; ALL_TAC] THEN
+      SUBGOAL_THEN `&0 < sqrt x /\ sqrt x pow 2 = x` STRIP_ASSUME_TAC THENL
+       [ASM_SIMP_TAC[SQRT_POS_LT; SQRT_POW_2; REAL_LT_IMP_LE]; ALL_TAC] THEN
+      ASM_REWRITE_TAC[] THEN
+      MAP_EVERY UNDISCH_TAC [`&0 < x`; `&0 < sqrt x`; `sqrt x pow 2 = x`] THEN
+      CONV_TAC REAL_FIELD;
+      REPEAT STRIP_TAC THEN MATCH_MP_TAC REAL_LE_INV2 THEN
+      SUBGOAL_THEN `&0 < x /\ &0 < sqrt x /\ sqrt x <= sqrt y`
+      STRIP_ASSUME_TAC THENL
+       [SUBGOAL_THEN `&0 < x` ASSUME_TAC THENL
+         [ASM_REAL_ARITH_TAC; ALL_TAC] THEN
+        ASM_SIMP_TAC[SQRT_POS_LT; SQRT_MONO_LE];
+        ALL_TAC] THEN
+      CONJ_TAC THENL [ASM_SIMP_TAC[REAL_LT_MUL]; ALL_TAC] THEN
+      MATCH_MP_TAC REAL_LE_MUL2 THEN ASM_SIMP_TAC[REAL_LT_IMP_LE]];
+    DISCH_TAC THEN
+    MATCH_MP_TAC(REAL_ARITH
+     `!s a b. s <= --(&2 * b) - --(&2 * a) ==> s <= &2 * (a - b)`) THEN
+    FIRST_X_ASSUM ACCEPT_TAC]);;
 
 let HILBERT_MAX_WEIGHT_BOUND = prove
  (`!i N. sum(1..N) (\j. inv(&(MAX i j)) * sqrt(&i / &j)) <= &4`,
@@ -986,23 +891,6 @@ let HILBERT_MAX_INEQUALITY = prove
 (* Hilbert's inequality with kernel 1/(i+j) and constant pi: the weight sums *)
 (* are at most 2 atn(sqrt(N/i)) < pi.                                        *)
 (* ------------------------------------------------------------------------- *)
-
-let ATN_GE_DIV = prove
- (`!t. &0 <= t ==> t / (&1 + t pow 2) <= atn t`,
-  GEN_TAC THEN ASM_CASES_TAC `t = &0` THEN
-  ASM_REWRITE_TAC[ATN_0; real_div; REAL_MUL_LZERO; REAL_LE_REFL] THEN
-  DISCH_TAC THEN SUBGOAL_THEN `&0 < t` ASSUME_TAC THENL
-   [ASM_REAL_ARITH_TAC; ALL_TAC] THEN
-  MP_TAC(ISPECL [`atn`; `\x. inv(&1 + x pow 2)`; `&0`; `t:real`] REAL_MVT) THEN
-  ASM_REWRITE_TAC[REAL_CONTINUOUS_ON_ATN; HAS_REAL_DERIVATIVE_ATN] THEN
-  REWRITE_TAC[IN_REAL_INTERVAL; ATN_0; REAL_SUB_RZERO] THEN
-  DISCH_THEN(X_CHOOSE_THEN `z:real` STRIP_ASSUME_TAC) THEN
-  ASM_REWRITE_TAC[] THEN GEN_REWRITE_TAC RAND_CONV [REAL_MUL_SYM] THEN
-  MATCH_MP_TAC REAL_LE_LMUL THEN ASM_SIMP_TAC[REAL_LT_IMP_LE] THEN
-  MATCH_MP_TAC REAL_LE_INV2 THEN CONJ_TAC THENL
-   [MP_TAC(SPEC `z:real` REAL_LE_POW_2) THEN REAL_ARITH_TAC;
-    MATCH_MP_TAC(REAL_ARITH `!x y:real. x <= y ==> &1 + x <= &1 + y`) THEN
-    MATCH_MP_TAC REAL_POW_LE2 THEN ASM_REAL_ARITH_TAC]);;
 
 let HILBERT_WEIGHT_BOUND = prove
  (`!i N. sum(1..N) (\j. inv(&(i + j)) * sqrt(&i / &j)) <= pi`,

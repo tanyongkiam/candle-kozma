@@ -5,6 +5,7 @@ Inequalities" (version 0.44).
 
   finite_sums.ml     Inequalities about finite sums and products of reals
   combinatorics.ml   Inequalities about finite set systems and prefix-free codes
+  real_lemmas.ml     General results of real analysis used by the files below
   bernoulli_exp.ml   Bernoulli's inequality and bounds on the exponential
   log_trig_sqrt.ml   Bounds on the logarithm, trigonometric and hyperbolic
                      functions and square roots
@@ -105,7 +106,8 @@ Deviations from the sheet:
     only x > 0, and ln(x + y) <= ln x + y/x only x > 0 and x + y > 0.
   - Trigonometric and hyperbolic: the condition x in [0, pi/2] printed at
     the end of the second hyperbolic line is applied to all three lines.
-    sinh x is written (e^x - e^-x)/2 and the cube root as root 3. At x = 0
+    sinh x is written (e^x - 1/e^x)/2, the form HOL Light's library uses,
+    and the cube root as root 3. At x = 0
     the terms x^3/sinh^2 x and x^2/sinh x are 0. sin x / x is undefined at
     0 and tan x at pi/2, so the second hyperbolic line assumes x > 0 and
     its last link x < pi/2; it is also proved multiplied by x on the closed
@@ -128,7 +130,9 @@ Deviations from the sheet:
   - Stirling: false as printed at n = 1, where e(n/e)^n exceeds the
     second term and the fourth term exceeds en(n/e)^n. The whole chain
     holds for n >= 2, the two middle links (the Robbins bounds) and
-    e(n/e)^n <= n! <= en(n/e)^n for n >= 1.
+    e(n/e)^n <= n! <= en(n/e)^n for n >= 1. The constant sqrt(2 pi) comes
+    from Wallis's product (HOL Light's Multivariate/gamma.ml), and
+    n!/(sqrt(2 pi n)(n/e)^n) -> 1 is also proved.
   - Jensen (convexity.ml): the convex form is HOL Light's
     REAL_CONVEX_ON_IMP_JENSEN; the concave form is stated with -phi convex.
     Both need phi on a real interval and a finite index set.

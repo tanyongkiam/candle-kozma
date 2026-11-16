@@ -244,7 +244,8 @@ let LOG_SQRT_BOUNDS = prove
 
 (* ------------------------------------------------------------------------- *)
 (* ln n + 1/(n+1) < ln(n+1) < ln n + 1/n <= H_n <= ln n + 1 for n >= 1; the *)
-(* first two links hold for every real n > 0.                                *)
+(* first two links hold for every real n > 0. The bounds on H_n compare the  *)
+(* sum with the integral of 1/x (REAL_SUM_INTEGRAL_[LU]BOUND_DECREASING).    *)
 (* ------------------------------------------------------------------------- *)
 
 let LOG_SUC_BOUNDS = prove
@@ -273,23 +274,45 @@ let LOG_HARMONIC_BOUNDS = prove
            log(&n) + inv(&n) <= sum(1..n) (\i. inv(&i)) /\
            sum(1..n) (\i. inv(&i)) <= log(&n) + &1`,
   GEN_TAC THEN DISCH_TAC THEN
-  SUBGOAL_THEN `!n. 1 <= n ==> &0 < &n` ASSUME_TAC THENL
-   [REWRITE_TAC[REAL_OF_NUM_LT] THEN ARITH_TAC; ALL_TAC] THEN
-  ASM_SIMP_TAC[LOG_SUC_BOUNDS] THEN
-  UNDISCH_TAC `1 <= n` THEN SPEC_TAC(`n:num`,`n:num`) THEN
-  MATCH_MP_TAC num_INDUCTION THEN REWRITE_TAC[ARITH_RULE `~(1 <= 0)`] THEN
-  X_GEN_TAC `n:num` THEN ASM_CASES_TAC `n = 0` THENL
-   [ASM_REWRITE_TAC[SUM_SING_NUMSEG; ARITH; LOG_1; REAL_INV_1] THEN
-    REAL_ARITH_TAC;
+  SUBGOAL_THEN `&0 < &n` (fun th -> REWRITE_TAC[MATCH_MP LOG_SUC_BOUNDS th])
+  THENL [REWRITE_TAC[REAL_OF_NUM_LT] THEN ASM_ARITH_TAC; ALL_TAC] THEN
+  ASM_CASES_TAC `n = 1` THENL
+   [ASM_REWRITE_TAC[SUM_SING_NUMSEG; LOG_1; REAL_INV_1] THEN REAL_ARITH_TAC;
     ALL_TAC] THEN
-  ASM_REWRITE_TAC[ARITH_RULE `1 <= SUC n`;
-                  ARITH_RULE `1 <= n <=> ~(n = 0)`] THEN
-  STRIP_TAC THEN
-  REWRITE_TAC[SUM_CLAUSES_NUMSEG; ARITH_RULE `1 <= SUC n`;
-              GSYM REAL_OF_NUM_SUC] THEN
-  MP_TAC(SPEC `&n` LOG_SUC_BOUNDS) THEN ANTS_TAC THENL
-   [ASM_SIMP_TAC[ARITH_RULE `1 <= n <=> ~(n = 0)`]; ALL_TAC] THEN
-  ASM_REAL_ARITH_TAC);;
+  SUBGOAL_THEN
+   `!x. x IN real_interval[&1,&n]
+        ==> (log has_real_derivative inv x)
+            (atreal x within real_interval[&1,&n])`
+  ASSUME_TAC THENL
+   [REWRITE_TAC[IN_REAL_INTERVAL] THEN REPEAT STRIP_TAC THEN
+    MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN
+    MATCH_MP_TAC HAS_REAL_DERIVATIVE_LOG THEN ASM_REAL_ARITH_TAC;
+    ALL_TAC] THEN
+  SUBGOAL_THEN `!x y. &1 <= x /\ x <= y ==> inv y <= inv x` ASSUME_TAC THENL
+   [REPEAT STRIP_TAC THEN MATCH_MP_TAC REAL_LE_INV2 THEN ASM_REAL_ARITH_TAC;
+    ALL_TAC] THEN
+  CONJ_TAC THENL
+   [SUBGOAL_THEN `?m. n = m + 1 /\ 1 <= m`
+     (X_CHOOSE_THEN `m:num` (CONJUNCTS_THEN2 SUBST_ALL_TAC ASSUME_TAC)) THENL
+     [EXISTS_TAC `n - 1` THEN ASM_ARITH_TAC; ALL_TAC] THEN
+    MP_TAC(ISPECL [`inv:real->real`; `log`; `1`; `m:num`]
+                  REAL_SUM_INTEGRAL_LBOUND_DECREASING) THEN
+    RULE_ASSUM_TAC(REWRITE_RULE[GSYM REAL_OF_NUM_ADD]) THEN ASM_SIMP_TAC[] THEN
+    REWRITE_TAC[GSYM ADD1; SUM_CLAUSES_NUMSEG; ARITH_RULE `1 <= SUC m`] THEN
+    REWRITE_TAC[ADD1; GSYM REAL_OF_NUM_ADD; LOG_1] THEN
+    DISCH_TAC THEN
+    MATCH_MP_TAC(REAL_ARITH `a - &0 <= s ==> a + b <= s + b`) THEN
+    FIRST_X_ASSUM ACCEPT_TAC;
+    MP_TAC(ISPECL [`inv:real->real`; `log`; `2`; `n:num`]
+                  REAL_SUM_INTEGRAL_UBOUND_DECREASING) THEN
+    CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
+    ASM_SIMP_TAC[ARITH_RULE `1 <= n /\ ~(n = 1) ==> 2 <= n`] THEN
+    ASM_SIMP_TAC[SUM_CLAUSES_LEFT; LOG_1] THEN
+    CONV_TAC(ONCE_DEPTH_CONV NUM_REDUCE_CONV) THEN
+    CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
+    DISCH_TAC THEN
+    MATCH_MP_TAC(REAL_ARITH `s <= a - &0 ==> &1 + s <= a + &1`) THEN
+    FIRST_X_ASSUM ACCEPT_TAC]);;
 
 (* ------------------------------------------------------------------------- *)
 (* |ln x| <= |x - 1/x|/2 for x > 0, ln(x + y) <= ln x + y/x for x > 0 and   *)
@@ -342,7 +365,8 @@ let LOG_BOUNDS_MISC = prove
 (* ------------------------------------------------------------------------- *)
 (* ln(1+x) >= x - x^2/2 for x >= 0 and ln(1+x) >= x - x^2 for x >= -0.68.    *)
 (* At x = -0.68 the bound reduces to ln(25/8) <= 1.1424, which follows from  *)
-(* the cubic Taylor bound on e^(1.1424/8) by exact rational arithmetic.      *)
+(* REAL_EXP_GE_PARTIAL_SUM_POW (degree 3, n = 8) by exact rational           *)
+(* arithmetic.                                                               *)
 (* ------------------------------------------------------------------------- *)
 
 let LOG_GE_X_SUB_SQUARE = prove
@@ -410,18 +434,14 @@ let LOG_GE_X_SUB_SQUARE = prove
   MATCH_MP_TAC(REAL_ARITH `l <= &714 / &625 ==> -- &714 / &625 <= --l`) THEN
   GEN_REWRITE_TAC RAND_CONV [GSYM LOG_EXP] THEN
   MATCH_MP_TAC LOG_MONO_LE_IMP THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  SUBGOAL_THEN `&714 / &625 = &8 * &357 / &2500` SUBST1_TAC THENL
-   [CONV_TAC REAL_RAT_REDUCE_CONV; ALL_TAC] THEN
-  REWRITE_TAC[REAL_EXP_N] THEN
+  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN REWRITE_TAC[] THEN
   TRANS_TAC REAL_LE_TRANS
-   `(&1 + &357 / &2500 + (&357 / &2500) pow 2 / &2 +
-     (&357 / &2500) pow 3 / &6) pow 8` THEN
+   `sum(0..3) (\k. ((&714 / &625) / &8) pow k / &(FACT k)) pow 8` THEN
   CONJ_TAC THENL
-   [CONV_TAC REAL_RAT_REDUCE_CONV;
-    MATCH_MP_TAC REAL_POW_LE2 THEN CONJ_TAC THENL
-     [CONV_TAC REAL_RAT_REDUCE_CONV;
-      MATCH_MP_TAC REAL_EXP_CUBIC_LE THEN CONV_TAC REAL_RAT_REDUCE_CONV]]);;
+   [CONV_TAC(ONCE_DEPTH_CONV EXPAND_SUM_CONV THENC DEPTH_CONV BETA_CONV THENC
+             DEPTH_CONV NUM_FACT_CONV THENC REAL_RAT_REDUCE_CONV);
+    MATCH_MP_TAC REAL_EXP_GE_PARTIAL_SUM_POW THEN
+    CONV_TAC REAL_RAT_REDUCE_CONV]);;
 
 let LOG_GE_X_SUB_HALF_SQUARE = prove
  (`!x. &0 <= x ==> x - x pow 2 / &2 <= log(&1 + x)`,
@@ -444,132 +464,6 @@ let LOG_QUADRATIC_LOWER = prove
  (`!x. (&0 <= x ==> x - x pow 2 / &2 <= log(&1 + x)) /\
        (-- &68 / &100 <= x ==> x - x pow 2 <= log(&1 + x))`,
   SIMP_TAC[LOG_GE_X_SUB_HALF_SQUARE; LOG_GE_X_SUB_SQUARE]);;
-
-(* ------------------------------------------------------------------------- *)
-(* Alternating Taylor bounds on sin and cos for x >= 0, each obtained from   *)
-(* the previous one by integrating from 0; the bounds on the even function   *)
-(* cos then hold for every x.                                                *)
-(* ------------------------------------------------------------------------- *)
-
-let COS_GE_QUADRATIC = prove
- (`!x. &1 - x pow 2 / &2 <= cos x`,
-  SUBGOAL_THEN `!x. &0 <= x ==> &1 - x pow 2 / &2 <= cos x` ASSUME_TAC THENL
-   [ALL_TAC;
-    GEN_TAC THEN DISJ_CASES_TAC(SPECL [`&0`; `x:real`] REAL_LE_TOTAL) THEN
-    ASM_SIMP_TAC[] THEN FIRST_X_ASSUM(MP_TAC o SPEC `--x:real`) THEN
-    REWRITE_TAC[COS_NEG; REAL_POW_NEG; ARITH] THEN
-    ANTS_TAC THENL [ASM_REAL_ARITH_TAC; REWRITE_TAC[]]] THEN
-  GEN_TAC THEN DISCH_TAC THEN ONCE_REWRITE_TAC[GSYM REAL_SUB_LE] THEN
-  MP_TAC(ISPECL [`\x. cos x - (&1 - x pow 2 / &2)`; `\x. x - sin x`;
-                 `{x:real | &0 <= x}`; `&0`; `x:real`]
-                HAS_REAL_DERIVATIVE_INCREASING_IMP) THEN
-  REWRITE_TAC[IN_ELIM_THM; IS_REALINTERVAL_CLAUSES; REAL_LE_REFL] THEN
-  ASM_REWRITE_TAC[COS_0] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  DISCH_THEN MATCH_MP_TAC THEN CONJ_TAC THEN X_GEN_TAC `y:real` THEN
-  DISCH_TAC THENL
-   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN REAL_DIFF_TAC THEN
-    CONV_TAC NUM_REDUCE_CONV THEN REAL_ARITH_TAC;
-    MP_TAC(SPEC `y:real` REAL_ABS_SIN_BOUND_LE) THEN ASM_REAL_ARITH_TAC]);;
-
-let SIN_GE_CUBIC = prove
- (`!x. &0 <= x ==> x - x pow 3 / &6 <= sin x`,
-  GEN_TAC THEN DISCH_TAC THEN ONCE_REWRITE_TAC[GSYM REAL_SUB_LE] THEN
-  MP_TAC(ISPECL [`\x. sin x - (x - x pow 3 / &6)`;
-                 `\x. cos x - (&1 - x pow 2 / &2)`;
-                 `{x:real | &0 <= x}`; `&0`; `x:real`]
-                HAS_REAL_DERIVATIVE_INCREASING_IMP) THEN
-  REWRITE_TAC[IN_ELIM_THM; IS_REALINTERVAL_CLAUSES; REAL_LE_REFL] THEN
-  ASM_REWRITE_TAC[SIN_0] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  DISCH_THEN MATCH_MP_TAC THEN CONJ_TAC THEN X_GEN_TAC `y:real` THEN
-  DISCH_TAC THENL
-   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN REAL_DIFF_TAC THEN
-    CONV_TAC NUM_REDUCE_CONV THEN REAL_ARITH_TAC;
-    MP_TAC(SPEC `y:real` COS_GE_QUADRATIC) THEN ASM_REAL_ARITH_TAC]);;
-
-let COS_LE_QUARTIC = prove
- (`!x. cos x <= &1 - x pow 2 / &2 + x pow 4 / &24`,
-  SUBGOAL_THEN `!x. &0 <= x ==> cos x <= &1 - x pow 2 / &2 + x pow 4 / &24`
-  ASSUME_TAC THENL
-   [ALL_TAC;
-    GEN_TAC THEN DISJ_CASES_TAC(SPECL [`&0`; `x:real`] REAL_LE_TOTAL) THEN
-    ASM_SIMP_TAC[] THEN FIRST_X_ASSUM(MP_TAC o SPEC `--x:real`) THEN
-    REWRITE_TAC[COS_NEG; REAL_POW_NEG; ARITH] THEN
-    ANTS_TAC THENL [ASM_REAL_ARITH_TAC; REWRITE_TAC[]]] THEN
-  GEN_TAC THEN DISCH_TAC THEN ONCE_REWRITE_TAC[GSYM REAL_SUB_LE] THEN
-  MP_TAC(ISPECL [`\x. (&1 - x pow 2 / &2 + x pow 4 / &24) - cos x`;
-                 `\x. sin x - (x - x pow 3 / &6)`;
-                 `{x:real | &0 <= x}`; `&0`; `x:real`]
-                HAS_REAL_DERIVATIVE_INCREASING_IMP) THEN
-  REWRITE_TAC[IN_ELIM_THM; IS_REALINTERVAL_CLAUSES; REAL_LE_REFL] THEN
-  ASM_REWRITE_TAC[COS_0] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  DISCH_THEN MATCH_MP_TAC THEN CONJ_TAC THEN X_GEN_TAC `y:real` THEN
-  DISCH_TAC THENL
-   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN REAL_DIFF_TAC THEN
-    CONV_TAC NUM_REDUCE_CONV THEN REAL_ARITH_TAC;
-    MP_TAC(SPEC `y:real` SIN_GE_CUBIC) THEN ASM_REAL_ARITH_TAC]);;
-
-let SIN_LE_QUINTIC = prove
- (`!x. &0 <= x ==> sin x <= x - x pow 3 / &6 + x pow 5 / &120`,
-  GEN_TAC THEN DISCH_TAC THEN ONCE_REWRITE_TAC[GSYM REAL_SUB_LE] THEN
-  MP_TAC(ISPECL [`\x. (x - x pow 3 / &6 + x pow 5 / &120) - sin x`;
-                 `\x. (&1 - x pow 2 / &2 + x pow 4 / &24) - cos x`;
-                 `{x:real | &0 <= x}`; `&0`; `x:real`]
-                HAS_REAL_DERIVATIVE_INCREASING_IMP) THEN
-  REWRITE_TAC[IN_ELIM_THM; IS_REALINTERVAL_CLAUSES; REAL_LE_REFL] THEN
-  ASM_REWRITE_TAC[SIN_0] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  DISCH_THEN MATCH_MP_TAC THEN CONJ_TAC THEN X_GEN_TAC `y:real` THEN
-  DISCH_TAC THENL
-   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN REAL_DIFF_TAC THEN
-    CONV_TAC NUM_REDUCE_CONV THEN REAL_ARITH_TAC;
-    MP_TAC(SPEC `y:real` COS_LE_QUARTIC) THEN ASM_REAL_ARITH_TAC]);;
-
-let COS_GE_SEXTIC = prove
- (`!x. &1 - x pow 2 / &2 + x pow 4 / &24 - x pow 6 / &720 <= cos x`,
-  SUBGOAL_THEN
-   `!x. &0 <= x
-        ==> &1 - x pow 2 / &2 + x pow 4 / &24 - x pow 6 / &720 <= cos x`
-  ASSUME_TAC THENL
-   [ALL_TAC;
-    GEN_TAC THEN DISJ_CASES_TAC(SPECL [`&0`; `x:real`] REAL_LE_TOTAL) THEN
-    ASM_SIMP_TAC[] THEN FIRST_X_ASSUM(MP_TAC o SPEC `--x:real`) THEN
-    REWRITE_TAC[COS_NEG; REAL_POW_NEG; ARITH] THEN
-    ANTS_TAC THENL [ASM_REAL_ARITH_TAC; REWRITE_TAC[]]] THEN
-  GEN_TAC THEN DISCH_TAC THEN ONCE_REWRITE_TAC[GSYM REAL_SUB_LE] THEN
-  MP_TAC(ISPECL
-   [`\x. cos x - (&1 - x pow 2 / &2 + x pow 4 / &24 - x pow 6 / &720)`;
-    `\x. (x - x pow 3 / &6 + x pow 5 / &120) - sin x`;
-    `{x:real | &0 <= x}`; `&0`; `x:real`]
-   HAS_REAL_DERIVATIVE_INCREASING_IMP) THEN
-  REWRITE_TAC[IN_ELIM_THM; IS_REALINTERVAL_CLAUSES; REAL_LE_REFL] THEN
-  ASM_REWRITE_TAC[COS_0] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  DISCH_THEN MATCH_MP_TAC THEN CONJ_TAC THEN X_GEN_TAC `y:real` THEN
-  DISCH_TAC THENL
-   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN REAL_DIFF_TAC THEN
-    CONV_TAC NUM_REDUCE_CONV THEN REAL_ARITH_TAC;
-    MP_TAC(SPEC `y:real` SIN_LE_QUINTIC) THEN ASM_REAL_ARITH_TAC]);;
-
-let SIN_GE_SEPTIC = prove
- (`!x. &0 <= x
-       ==> x - x pow 3 / &6 + x pow 5 / &120 - x pow 7 / &5040 <= sin x`,
-  GEN_TAC THEN DISCH_TAC THEN ONCE_REWRITE_TAC[GSYM REAL_SUB_LE] THEN
-  MP_TAC(ISPECL
-   [`\x. sin x - (x - x pow 3 / &6 + x pow 5 / &120 - x pow 7 / &5040)`;
-    `\x. cos x - (&1 - x pow 2 / &2 + x pow 4 / &24 - x pow 6 / &720)`;
-    `{x:real | &0 <= x}`; `&0`; `x:real`]
-   HAS_REAL_DERIVATIVE_INCREASING_IMP) THEN
-  REWRITE_TAC[IN_ELIM_THM; IS_REALINTERVAL_CLAUSES; REAL_LE_REFL] THEN
-  ASM_REWRITE_TAC[SIN_0] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  DISCH_THEN MATCH_MP_TAC THEN CONJ_TAC THEN X_GEN_TAC `y:real` THEN
-  DISCH_TAC THENL
-   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN REAL_DIFF_TAC THEN
-    CONV_TAC NUM_REDUCE_CONV THEN REAL_ARITH_TAC;
-    MP_TAC(SPEC `y:real` COS_GE_SEXTIC) THEN ASM_REAL_ARITH_TAC]);;
 
 (* ------------------------------------------------------------------------- *)
 (* 3.14 < pi < 3.1416, so on [0, pi/2] we have x^2 <= 8/3 and cos x >= 0.    *)
@@ -605,7 +499,10 @@ let TRIG_PADE_LE_CUBE_ROOT = prove
   SUBGOAL_THEN `cos x pow 2 <= (&1 - x pow 2 / &3) pow 3` ASSUME_TAC THENL
    [TRANS_TAC REAL_LE_TRANS `(&1 - x pow 2 / &2 + x pow 4 / &24) pow 2` THEN
     CONJ_TAC THENL
-     [MATCH_MP_TAC REAL_POW_LE2 THEN ASM_SIMP_TAC[COS_LE_QUARTIC];
+     [MATCH_MP_TAC REAL_POW_LE2 THEN ASM_REWRITE_TAC[] THEN
+      MP_TAC(CONJUNCT2(EXPAND_PARTIAL_SUM_RULE
+        (SPECL [`1`; `x:real`] COS_TAYLOR_BOUNDS))) THEN
+      REAL_ARITH_TAC;
       MP_TAC(SPECL [`(x:real) pow 6`; `&8 - &3 * x pow 2`] REAL_LE_MUL) THEN
       ANTS_TAC THENL
        [REWRITE_TAC[REAL_RING `(x:real) pow 6 = (x pow 3) pow 2`;
@@ -650,7 +547,11 @@ let TRIG_CUBE_ROOT_LE_CUBIC = prove
   MP_TAC(SPECL [`3`; `cos x`] REAL_POW_ROOT) THEN
   REWRITE_TAC[ARITH_ODD; ARITH] THEN DISCH_THEN SUBST1_TAC THEN
   TRANS_TAC REAL_LE_TRANS `&1 - x pow 2 / &2 + x pow 4 / &24` THEN
-  ASM_SIMP_TAC[COS_LE_QUARTIC] THEN
+  CONJ_TAC THENL
+   [MP_TAC(CONJUNCT2(EXPAND_PARTIAL_SUM_RULE
+      (SPECL [`1`; `x:real`] COS_TAYLOR_BOUNDS))) THEN
+    REAL_ARITH_TAC;
+    ALL_TAC] THEN
   MP_TAC(SPECL [`(x:real) pow 4`; `&9 - x pow 2`] REAL_LE_MUL) THEN
   ANTS_TAC THENL
    [REWRITE_TAC[REAL_RING `(x:real) pow 4 = (x pow 2) pow 2`;
@@ -663,10 +564,10 @@ let TRIG_CUBIC_LE_COS_SQRT3 = prove
   REPEAT STRIP_TAC THEN
   REWRITE_TAC[REAL_ARITH `x - x pow 3 / &6 = x * (&1 - x pow 2 / &6)`] THEN
   MATCH_MP_TAC REAL_LE_LMUL THEN ASM_REWRITE_TAC[] THEN
-  MP_TAC(SPEC `x / sqrt(&3)` COS_GE_QUADRATIC) THEN
-  ASM_SIMP_TAC[REAL_LE_DIV; SQRT_POS_LE; REAL_POS] THEN
+  MP_TAC(CONJUNCT1(EXPAND_PARTIAL_SUM_RULE
+    (SPECL [`0`; `x / sqrt(&3)`] COS_TAYLOR_BOUNDS))) THEN
   MATCH_MP_TAC(REAL_ARITH
-   `a / &2 = b ==> &1 - a / &2 <= c ==> &1 - b <= c`) THEN
+   `a / &2 = b ==> &1 + --(a / &2) <= c ==> &1 - b <= c`) THEN
   REWRITE_TAC[REAL_POW_DIV] THEN
   SIMP_TAC[SQRT_POW_2; REAL_POS] THEN REAL_ARITH_TAC);;
 
@@ -676,17 +577,22 @@ let TRIG_COS_SQRT3_LE_SIN = prove
   SUBGOAL_THEN `(x / sqrt(&3)) pow 2 = x pow 2 / &3` ASSUME_TAC THENL
    [REWRITE_TAC[REAL_POW_DIV] THEN SIMP_TAC[SQRT_POW_2; REAL_POS];
     ALL_TAC] THEN
-  MP_TAC(SPEC `x / sqrt(&3)` COS_LE_QUARTIC) THEN
-  ASM_SIMP_TAC[REAL_LE_DIV; SQRT_POS_LE; REAL_POS] THEN
+  MP_TAC(CONJUNCT2(EXPAND_PARTIAL_SUM_RULE
+    (SPECL [`1`; `x / sqrt(&3)`] COS_TAYLOR_BOUNDS))) THEN
   REWRITE_TAC[REAL_RING `(y:real) pow 4 = (y pow 2) pow 2`] THEN
   ASM_REWRITE_TAC[] THEN DISCH_TAC THEN
   TRANS_TAC REAL_LE_TRANS
    `x * (&1 - (x pow 2 / &3) / &2 + (x pow 2 / &3) pow 2 / &24)` THEN
   CONJ_TAC THENL
-   [MATCH_MP_TAC REAL_LE_LMUL THEN ASM_REWRITE_TAC[]; ALL_TAC] THEN
+   [MATCH_MP_TAC REAL_LE_LMUL THEN ASM_REWRITE_TAC[] THEN ASM_REAL_ARITH_TAC;
+    ALL_TAC] THEN
   TRANS_TAC REAL_LE_TRANS
    `x - x pow 3 / &6 + x pow 5 / &120 - x pow 7 / &5040` THEN
-  ASM_SIMP_TAC[SIN_GE_SEPTIC] THEN
+  CONJ_TAC THENL
+   [ALL_TAC;
+    MP_TAC(EXPAND_PARTIAL_SUM_RULE
+             (SPECL [`1`; `x:real`] SIN_TAYLOR_BOUNDS)) THEN
+    ASM_REWRITE_TAC[] THEN REAL_ARITH_TAC] THEN
   MP_TAC(SPECL [`x:real`; `5`] REAL_POW_LE) THEN ASM_REWRITE_TAC[] THEN
   DISCH_TAC THEN
   MP_TAC(SPECL [`(x:real) pow 5`; `&8 / &3 - x pow 2`] REAL_LE_MUL) THEN
@@ -708,7 +614,10 @@ let TRIGONOMETRIC_BOUNDS = prove
                TRIG_CUBIC_LE_COS_SQRT3; TRIG_COS_SQRT3_LE_SIN] THEN
   CONJ_TAC THENL
    [REWRITE_TAC[REAL_ARITH `x - x pow 3 / &2 = x * (&1 - x pow 2 / &2)`] THEN
-    MATCH_MP_TAC REAL_LE_LMUL THEN ASM_SIMP_TAC[COS_GE_QUADRATIC];
+    MATCH_MP_TAC REAL_LE_LMUL THEN ASM_REWRITE_TAC[] THEN
+    MP_TAC(CONJUNCT1(EXPAND_PARTIAL_SUM_RULE
+      (SPECL [`0`; `x:real`] COS_TAYLOR_BOUNDS))) THEN
+    REAL_ARITH_TAC;
     SUBGOAL_THEN `&0 < &1 - x pow 2 / &3 /\ &1 - x pow 2 / &3 <= &1`
     STRIP_ASSUME_TAC THENL
      [MP_TAC(SPEC `x:real` REAL_LE_POW_2) THEN ASM_REAL_ARITH_TAC;
@@ -718,365 +627,25 @@ let TRIGONOMETRIC_BOUNDS = prove
     MATCH_MP_TAC REAL_LE_LMUL THEN ASM_REWRITE_TAC[]]);;
 
 (* ------------------------------------------------------------------------- *)
-(* Taylor bounds on sinh x = (e^x - e^-x)/2 and cosh x = (e^x + e^-x)/2 for  *)
-(* x >= 0: lower bounds from the series, and upper bounds on [0, b] when     *)
-(* cosh b <= c, with c in place of the last Taylor coefficient's cosh. The   *)
-(* bounds on the even function cosh hold for every x (upper bounds for       *)
-(* |x| <= b).                                                                *)
+(* cosh(3927/2500) <= 63/25, by exact rational arithmetic from              *)
+(* REAL_EXP_LE_RATIO_POW (n = 32) and REAL_EXP_GE_PARTIAL_SUM_POW (degree 3, *)
+(* n = 8).                                                                   *)
 (* ------------------------------------------------------------------------- *)
-
-let COSH_GE_1 = prove
- (`!x. &1 <= (exp x + exp(--x)) / &2`,
-  GEN_TAC THEN MP_TAC(SPEC `x:real` REAL_EXP_LE_X) THEN
-  MP_TAC(SPEC `--x:real` REAL_EXP_LE_X) THEN REAL_ARITH_TAC);;
-
-let SINH_GE_X = prove
- (`!x. &0 <= x ==> x <= (exp x - exp(--x)) / &2`,
-  GEN_TAC THEN DISCH_TAC THEN ONCE_REWRITE_TAC[GSYM REAL_SUB_LE] THEN
-  MP_TAC(ISPECL [`\x. (exp x - exp(--x)) / &2 - x`;
-                 `\x. (exp x + exp(--x)) / &2 - &1`;
-                 `{x:real | &0 <= x}`; `&0`; `x:real`]
-                HAS_REAL_DERIVATIVE_INCREASING_IMP) THEN
-  REWRITE_TAC[IN_ELIM_THM; IS_REALINTERVAL_CLAUSES; REAL_LE_REFL] THEN
-  ASM_REWRITE_TAC[REAL_NEG_0; REAL_EXP_0] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  DISCH_THEN MATCH_MP_TAC THEN CONJ_TAC THEN X_GEN_TAC `y:real` THEN
-  DISCH_TAC THENL
-   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN REAL_DIFF_TAC THEN
-    CONV_TAC NUM_REDUCE_CONV THEN REAL_ARITH_TAC;
-    MP_TAC(SPEC `y:real` COSH_GE_1) THEN REAL_ARITH_TAC]);;
-
-let COSH_GE_QUADRATIC = prove
- (`!x. &1 + x pow 2 / &2 <= (exp x + exp(--x)) / &2`,
-  SUBGOAL_THEN
-   `!x. &0 <= x ==> &1 + x pow 2 / &2 <= (exp x + exp(--x)) / &2`
-  ASSUME_TAC THENL
-   [ALL_TAC;
-    GEN_TAC THEN DISJ_CASES_TAC(SPECL [`&0`; `x:real`] REAL_LE_TOTAL) THEN
-    ASM_SIMP_TAC[] THEN FIRST_X_ASSUM(MP_TAC o SPEC `--x:real`) THEN
-    REWRITE_TAC[REAL_NEG_NEG; REAL_POW_NEG; ARITH] THEN
-    ANTS_TAC THENL [ASM_REAL_ARITH_TAC; REAL_ARITH_TAC]] THEN
-  GEN_TAC THEN DISCH_TAC THEN ONCE_REWRITE_TAC[GSYM REAL_SUB_LE] THEN
-  MP_TAC(ISPECL [`\x. (exp x + exp(--x)) / &2 - (&1 + x pow 2 / &2)`;
-                 `\x. (exp x - exp(--x)) / &2 - x`;
-                 `{x:real | &0 <= x}`; `&0`; `x:real`]
-                HAS_REAL_DERIVATIVE_INCREASING_IMP) THEN
-  REWRITE_TAC[IN_ELIM_THM; IS_REALINTERVAL_CLAUSES; REAL_LE_REFL] THEN
-  ASM_REWRITE_TAC[REAL_NEG_0; REAL_EXP_0] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  DISCH_THEN MATCH_MP_TAC THEN CONJ_TAC THEN X_GEN_TAC `y:real` THEN
-  DISCH_TAC THENL
-   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN REAL_DIFF_TAC THEN
-    CONV_TAC NUM_REDUCE_CONV THEN REAL_ARITH_TAC;
-    MP_TAC(SPEC `y:real` SINH_GE_X) THEN ASM_REAL_ARITH_TAC]);;
-
-let SINH_GE_CUBIC = prove
- (`!x. &0 <= x ==> x + x pow 3 / &6 <= (exp x - exp(--x)) / &2`,
-  GEN_TAC THEN DISCH_TAC THEN ONCE_REWRITE_TAC[GSYM REAL_SUB_LE] THEN
-  MP_TAC(ISPECL [`\x. (exp x - exp(--x)) / &2 - (x + x pow 3 / &6)`;
-                 `\x. (exp x + exp(--x)) / &2 - (&1 + x pow 2 / &2)`;
-                 `{x:real | &0 <= x}`; `&0`; `x:real`]
-                HAS_REAL_DERIVATIVE_INCREASING_IMP) THEN
-  REWRITE_TAC[IN_ELIM_THM; IS_REALINTERVAL_CLAUSES; REAL_LE_REFL] THEN
-  ASM_REWRITE_TAC[REAL_NEG_0; REAL_EXP_0] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  DISCH_THEN MATCH_MP_TAC THEN CONJ_TAC THEN X_GEN_TAC `y:real` THEN
-  DISCH_TAC THENL
-   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN REAL_DIFF_TAC THEN
-    CONV_TAC NUM_REDUCE_CONV THEN REAL_ARITH_TAC;
-    MP_TAC(SPEC `y:real` COSH_GE_QUADRATIC) THEN ASM_REAL_ARITH_TAC]);;
-
-let COSH_GE_QUARTIC = prove
- (`!x. &1 + x pow 2 / &2 + x pow 4 / &24 <= (exp x + exp(--x)) / &2`,
-  SUBGOAL_THEN
-   `!x. &0 <= x
-        ==> &1 + x pow 2 / &2 + x pow 4 / &24 <= (exp x + exp(--x)) / &2`
-  ASSUME_TAC THENL
-   [ALL_TAC;
-    GEN_TAC THEN DISJ_CASES_TAC(SPECL [`&0`; `x:real`] REAL_LE_TOTAL) THEN
-    ASM_SIMP_TAC[] THEN FIRST_X_ASSUM(MP_TAC o SPEC `--x:real`) THEN
-    REWRITE_TAC[REAL_NEG_NEG; REAL_POW_NEG; ARITH] THEN
-    ANTS_TAC THENL [ASM_REAL_ARITH_TAC; REAL_ARITH_TAC]] THEN
-  GEN_TAC THEN DISCH_TAC THEN ONCE_REWRITE_TAC[GSYM REAL_SUB_LE] THEN
-  MP_TAC(ISPECL
-   [`\x. (exp x + exp(--x)) / &2 - (&1 + x pow 2 / &2 + x pow 4 / &24)`;
-    `\x. (exp x - exp(--x)) / &2 - (x + x pow 3 / &6)`;
-    `{x:real | &0 <= x}`; `&0`; `x:real`]
-   HAS_REAL_DERIVATIVE_INCREASING_IMP) THEN
-  REWRITE_TAC[IN_ELIM_THM; IS_REALINTERVAL_CLAUSES; REAL_LE_REFL] THEN
-  ASM_REWRITE_TAC[REAL_NEG_0; REAL_EXP_0] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  DISCH_THEN MATCH_MP_TAC THEN CONJ_TAC THEN X_GEN_TAC `y:real` THEN
-  DISCH_TAC THENL
-   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN REAL_DIFF_TAC THEN
-    CONV_TAC NUM_REDUCE_CONV THEN REAL_ARITH_TAC;
-    MP_TAC(SPEC `y:real` SINH_GE_CUBIC) THEN ASM_REAL_ARITH_TAC]);;
-
-let SINH_GE_QUINTIC = prove
- (`!x. &0 <= x
-       ==> x + x pow 3 / &6 + x pow 5 / &120 <= (exp x - exp(--x)) / &2`,
-  GEN_TAC THEN DISCH_TAC THEN ONCE_REWRITE_TAC[GSYM REAL_SUB_LE] THEN
-  MP_TAC(ISPECL
-   [`\x. (exp x - exp(--x)) / &2 - (x + x pow 3 / &6 + x pow 5 / &120)`;
-    `\x. (exp x + exp(--x)) / &2 - (&1 + x pow 2 / &2 + x pow 4 / &24)`;
-    `{x:real | &0 <= x}`; `&0`; `x:real`]
-   HAS_REAL_DERIVATIVE_INCREASING_IMP) THEN
-  REWRITE_TAC[IN_ELIM_THM; IS_REALINTERVAL_CLAUSES; REAL_LE_REFL] THEN
-  ASM_REWRITE_TAC[REAL_NEG_0; REAL_EXP_0] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  DISCH_THEN MATCH_MP_TAC THEN CONJ_TAC THEN X_GEN_TAC `y:real` THEN
-  DISCH_TAC THENL
-   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN REAL_DIFF_TAC THEN
-    CONV_TAC NUM_REDUCE_CONV THEN REAL_ARITH_TAC;
-    MP_TAC(SPEC `y:real` COSH_GE_QUARTIC) THEN ASM_REAL_ARITH_TAC]);;
-
-let COSH_LE_BOUND = prove
- (`!b c x. (exp b + exp(--b)) / &2 <= c /\ abs x <= b
-           ==> (exp x + exp(--x)) / &2 <= c`,
-  SUBGOAL_THEN
-   `!b c x. (exp b + exp(--b)) / &2 <= c /\ &0 <= x /\ x <= b
-            ==> (exp x + exp(--x)) / &2 <= c`
-  ASSUME_TAC THENL
-   [ALL_TAC;
-    REPEAT STRIP_TAC THEN
-    DISJ_CASES_TAC(SPECL [`&0`; `x:real`] REAL_LE_TOTAL) THENL
-     [FIRST_X_ASSUM(MP_TAC o SPECL [`b:real`; `c:real`; `x:real`]);
-      FIRST_X_ASSUM(MP_TAC o SPECL [`b:real`; `c:real`; `--x:real`])] THEN
-    REWRITE_TAC[REAL_NEG_NEG] THEN
-    (ANTS_TAC THENL [ASM_REAL_ARITH_TAC; REAL_ARITH_TAC])] THEN
-  REPEAT STRIP_TAC THEN
-  TRANS_TAC REAL_LE_TRANS `(exp b + exp(--b)) / &2` THEN
-  ASM_REWRITE_TAC[] THEN
-  MP_TAC(ISPECL [`\x. (exp x + exp(--x)) / &2`;
-                 `\x. (exp x - exp(--x)) / &2`;
-                 `{y:real | &0 <= y}`; `x:real`; `b:real`]
-                HAS_REAL_DERIVATIVE_INCREASING_IMP) THEN
-  REWRITE_TAC[IN_ELIM_THM; IS_REALINTERVAL_CLAUSES] THEN
-  DISCH_THEN MATCH_MP_TAC THEN REPEAT CONJ_TAC THEN
-  TRY ASM_REAL_ARITH_TAC THEN X_GEN_TAC `y:real` THEN DISCH_TAC THENL
-   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN REAL_DIFF_TAC THEN
-    REAL_ARITH_TAC;
-    MP_TAC(SPEC `y:real` SINH_GE_X) THEN ASM_REAL_ARITH_TAC]);;
-
-let SINH_LE_LINEAR_BOUND = prove
- (`!b c x. (exp b + exp(--b)) / &2 <= c /\ &0 <= x /\ x <= b
-           ==> (exp x - exp(--x)) / &2 <= c * x`,
-  REPEAT STRIP_TAC THEN ONCE_REWRITE_TAC[GSYM REAL_SUB_LE] THEN
-  MP_TAC(ISPECL [`\x. c * x - (exp x - exp(--x)) / &2`;
-                 `\x. c - (exp x + exp(--x)) / &2`;
-                 `{y:real | &0 <= y /\ y <= b}`; `&0`; `x:real`]
-                HAS_REAL_DERIVATIVE_INCREASING_IMP) THEN
-  REWRITE_TAC[IN_ELIM_THM; IS_REALINTERVAL_CLAUSES; REAL_LE_REFL] THEN
-  ASM_REWRITE_TAC[REAL_NEG_0; REAL_EXP_0] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  REWRITE_TAC[REAL_MUL_RZERO] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  DISCH_THEN MATCH_MP_TAC THEN REPEAT CONJ_TAC THEN
-  TRY ASM_REAL_ARITH_TAC THEN X_GEN_TAC `y:real` THEN STRIP_TAC THENL
-   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN REAL_DIFF_TAC THEN
-    CONV_TAC NUM_REDUCE_CONV THEN REAL_ARITH_TAC;
-    MP_TAC(SPECL [`b:real`; `c:real`; `y:real`] COSH_LE_BOUND) THEN
-    ANTS_TAC THENL [ASM_REAL_ARITH_TAC; REAL_ARITH_TAC]]);;
-
-let COSH_LE_QUADRATIC_BOUND = prove
- (`!b c x. (exp b + exp(--b)) / &2 <= c /\ abs x <= b
-           ==> (exp x + exp(--x)) / &2 <= &1 + c * x pow 2 / &2`,
-  SUBGOAL_THEN
-   `!b c x. (exp b + exp(--b)) / &2 <= c /\ &0 <= x /\ x <= b
-            ==> (exp x + exp(--x)) / &2 <= &1 + c * x pow 2 / &2`
-  ASSUME_TAC THENL
-   [ALL_TAC;
-    REPEAT STRIP_TAC THEN
-    DISJ_CASES_TAC(SPECL [`&0`; `x:real`] REAL_LE_TOTAL) THENL
-     [FIRST_X_ASSUM(MP_TAC o SPECL [`b:real`; `c:real`; `x:real`]);
-      FIRST_X_ASSUM(MP_TAC o SPECL [`b:real`; `c:real`; `--x:real`])] THEN
-    REWRITE_TAC[REAL_NEG_NEG; REAL_POW_NEG; ARITH] THEN
-    (ANTS_TAC THENL [ASM_REAL_ARITH_TAC; REAL_ARITH_TAC])] THEN
-  REPEAT STRIP_TAC THEN ONCE_REWRITE_TAC[GSYM REAL_SUB_LE] THEN
-  MP_TAC(ISPECL [`\x. (&1 + c * x pow 2 / &2) - (exp x + exp(--x)) / &2`;
-                 `\x. c * x - (exp x - exp(--x)) / &2`;
-                 `{y:real | &0 <= y /\ y <= b}`; `&0`; `x:real`]
-                HAS_REAL_DERIVATIVE_INCREASING_IMP) THEN
-  REWRITE_TAC[IN_ELIM_THM; IS_REALINTERVAL_CLAUSES; REAL_LE_REFL] THEN
-  ASM_REWRITE_TAC[REAL_NEG_0; REAL_EXP_0] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  REWRITE_TAC[REAL_MUL_RZERO] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  DISCH_THEN MATCH_MP_TAC THEN REPEAT CONJ_TAC THEN
-  TRY ASM_REAL_ARITH_TAC THEN X_GEN_TAC `y:real` THEN STRIP_TAC THENL
-   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN REAL_DIFF_TAC THEN
-    CONV_TAC NUM_REDUCE_CONV THEN REAL_ARITH_TAC;
-    MP_TAC(SPECL [`b:real`; `c:real`; `y:real`] SINH_LE_LINEAR_BOUND) THEN
-    ANTS_TAC THENL [ASM_REAL_ARITH_TAC; REAL_ARITH_TAC]]);;
-
-let SINH_LE_CUBIC_BOUND = prove
- (`!b c x. (exp b + exp(--b)) / &2 <= c /\ &0 <= x /\ x <= b
-           ==> (exp x - exp(--x)) / &2 <= x + c * x pow 3 / &6`,
-  REPEAT STRIP_TAC THEN ONCE_REWRITE_TAC[GSYM REAL_SUB_LE] THEN
-  MP_TAC(ISPECL [`\x. (x + c * x pow 3 / &6) - (exp x - exp(--x)) / &2`;
-                 `\x. (&1 + c * x pow 2 / &2) - (exp x + exp(--x)) / &2`;
-                 `{y:real | &0 <= y /\ y <= b}`; `&0`; `x:real`]
-                HAS_REAL_DERIVATIVE_INCREASING_IMP) THEN
-  REWRITE_TAC[IN_ELIM_THM; IS_REALINTERVAL_CLAUSES; REAL_LE_REFL] THEN
-  ASM_REWRITE_TAC[REAL_NEG_0; REAL_EXP_0] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  REWRITE_TAC[REAL_MUL_RZERO] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  DISCH_THEN MATCH_MP_TAC THEN REPEAT CONJ_TAC THEN
-  TRY ASM_REAL_ARITH_TAC THEN X_GEN_TAC `y:real` THEN STRIP_TAC THENL
-   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN REAL_DIFF_TAC THEN
-    CONV_TAC NUM_REDUCE_CONV THEN REAL_ARITH_TAC;
-    MP_TAC(SPECL [`b:real`; `c:real`; `y:real`] COSH_LE_QUADRATIC_BOUND) THEN
-    ANTS_TAC THENL [ASM_REAL_ARITH_TAC; REAL_ARITH_TAC]]);;
-
-let COSH_LE_QUARTIC_BOUND = prove
- (`!b c x. (exp b + exp(--b)) / &2 <= c /\ abs x <= b
-           ==> (exp x + exp(--x)) / &2 <=
-               &1 + x pow 2 / &2 + c * x pow 4 / &24`,
-  SUBGOAL_THEN
-   `!b c x. (exp b + exp(--b)) / &2 <= c /\ &0 <= x /\ x <= b
-            ==> (exp x + exp(--x)) / &2 <=
-                &1 + x pow 2 / &2 + c * x pow 4 / &24`
-  ASSUME_TAC THENL
-   [ALL_TAC;
-    REPEAT STRIP_TAC THEN
-    DISJ_CASES_TAC(SPECL [`&0`; `x:real`] REAL_LE_TOTAL) THENL
-     [FIRST_X_ASSUM(MP_TAC o SPECL [`b:real`; `c:real`; `x:real`]);
-      FIRST_X_ASSUM(MP_TAC o SPECL [`b:real`; `c:real`; `--x:real`])] THEN
-    REWRITE_TAC[REAL_NEG_NEG; REAL_POW_NEG; ARITH] THEN
-    (ANTS_TAC THENL [ASM_REAL_ARITH_TAC; REAL_ARITH_TAC])] THEN
-  REPEAT STRIP_TAC THEN ONCE_REWRITE_TAC[GSYM REAL_SUB_LE] THEN
-  MP_TAC(ISPECL
-   [`\x. (&1 + x pow 2 / &2 + c * x pow 4 / &24) - (exp x + exp(--x)) / &2`;
-    `\x. (x + c * x pow 3 / &6) - (exp x - exp(--x)) / &2`;
-    `{y:real | &0 <= y /\ y <= b}`; `&0`; `x:real`]
-   HAS_REAL_DERIVATIVE_INCREASING_IMP) THEN
-  REWRITE_TAC[IN_ELIM_THM; IS_REALINTERVAL_CLAUSES; REAL_LE_REFL] THEN
-  ASM_REWRITE_TAC[REAL_NEG_0; REAL_EXP_0] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  REWRITE_TAC[REAL_MUL_RZERO] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  DISCH_THEN MATCH_MP_TAC THEN REPEAT CONJ_TAC THEN
-  TRY ASM_REAL_ARITH_TAC THEN X_GEN_TAC `y:real` THEN STRIP_TAC THENL
-   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN REAL_DIFF_TAC THEN
-    CONV_TAC NUM_REDUCE_CONV THEN REAL_ARITH_TAC;
-    MP_TAC(SPECL [`b:real`; `c:real`; `y:real`] SINH_LE_CUBIC_BOUND) THEN
-    ANTS_TAC THENL [ASM_REAL_ARITH_TAC; REAL_ARITH_TAC]]);;
-
-let SINH_LE_QUINTIC_BOUND = prove
- (`!b c x. (exp b + exp(--b)) / &2 <= c /\ &0 <= x /\ x <= b
-           ==> (exp x - exp(--x)) / &2 <=
-               x + x pow 3 / &6 + c * x pow 5 / &120`,
-  REPEAT STRIP_TAC THEN ONCE_REWRITE_TAC[GSYM REAL_SUB_LE] THEN
-  MP_TAC(ISPECL
-   [`\x. (x + x pow 3 / &6 + c * x pow 5 / &120) - (exp x - exp(--x)) / &2`;
-    `\x. (&1 + x pow 2 / &2 + c * x pow 4 / &24) - (exp x + exp(--x)) / &2`;
-    `{y:real | &0 <= y /\ y <= b}`; `&0`; `x:real`]
-   HAS_REAL_DERIVATIVE_INCREASING_IMP) THEN
-  REWRITE_TAC[IN_ELIM_THM; IS_REALINTERVAL_CLAUSES; REAL_LE_REFL] THEN
-  ASM_REWRITE_TAC[REAL_NEG_0; REAL_EXP_0] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  REWRITE_TAC[REAL_MUL_RZERO] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  DISCH_THEN MATCH_MP_TAC THEN REPEAT CONJ_TAC THEN
-  TRY ASM_REAL_ARITH_TAC THEN X_GEN_TAC `y:real` THEN STRIP_TAC THENL
-   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN REAL_DIFF_TAC THEN
-    CONV_TAC NUM_REDUCE_CONV THEN REAL_ARITH_TAC;
-    MP_TAC(SPECL [`b:real`; `c:real`; `y:real`] COSH_LE_QUARTIC_BOUND) THEN
-    ANTS_TAC THENL [ASM_REAL_ARITH_TAC; REAL_ARITH_TAC]]);;
-
-let COSH_LE_SEXTIC_BOUND = prove
- (`!b c x. (exp b + exp(--b)) / &2 <= c /\ abs x <= b
-           ==> (exp x + exp(--x)) / &2 <=
-               &1 + x pow 2 / &2 + x pow 4 / &24 + c * x pow 6 / &720`,
-  SUBGOAL_THEN
-   `!b c x. (exp b + exp(--b)) / &2 <= c /\ &0 <= x /\ x <= b
-            ==> (exp x + exp(--x)) / &2 <=
-                &1 + x pow 2 / &2 + x pow 4 / &24 + c * x pow 6 / &720`
-  ASSUME_TAC THENL
-   [ALL_TAC;
-    REPEAT STRIP_TAC THEN
-    DISJ_CASES_TAC(SPECL [`&0`; `x:real`] REAL_LE_TOTAL) THENL
-     [FIRST_X_ASSUM(MP_TAC o SPECL [`b:real`; `c:real`; `x:real`]);
-      FIRST_X_ASSUM(MP_TAC o SPECL [`b:real`; `c:real`; `--x:real`])] THEN
-    REWRITE_TAC[REAL_NEG_NEG; REAL_POW_NEG; ARITH] THEN
-    (ANTS_TAC THENL [ASM_REAL_ARITH_TAC; REAL_ARITH_TAC])] THEN
-  REPEAT STRIP_TAC THEN ONCE_REWRITE_TAC[GSYM REAL_SUB_LE] THEN
-  MP_TAC(ISPECL
-   [`\x. (&1 + x pow 2 / &2 + x pow 4 / &24 + c * x pow 6 / &720) -
-         (exp x + exp(--x)) / &2`;
-    `\x. (x + x pow 3 / &6 + c * x pow 5 / &120) - (exp x - exp(--x)) / &2`;
-    `{y:real | &0 <= y /\ y <= b}`; `&0`; `x:real`]
-   HAS_REAL_DERIVATIVE_INCREASING_IMP) THEN
-  REWRITE_TAC[IN_ELIM_THM; IS_REALINTERVAL_CLAUSES; REAL_LE_REFL] THEN
-  ASM_REWRITE_TAC[REAL_NEG_0; REAL_EXP_0] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  REWRITE_TAC[REAL_MUL_RZERO] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  DISCH_THEN MATCH_MP_TAC THEN REPEAT CONJ_TAC THEN
-  TRY ASM_REAL_ARITH_TAC THEN X_GEN_TAC `y:real` THEN STRIP_TAC THENL
-   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN REAL_DIFF_TAC THEN
-    CONV_TAC NUM_REDUCE_CONV THEN REAL_ARITH_TAC;
-    MP_TAC(SPECL [`b:real`; `c:real`; `y:real`] SINH_LE_QUINTIC_BOUND) THEN
-    ANTS_TAC THENL [ASM_REAL_ARITH_TAC; REAL_ARITH_TAC]]);;
-
-let SINH_LE_SEPTIC_BOUND = prove
- (`!b c x. (exp b + exp(--b)) / &2 <= c /\ &0 <= x /\ x <= b
-           ==> (exp x - exp(--x)) / &2 <=
-               x + x pow 3 / &6 + x pow 5 / &120 + c * x pow 7 / &5040`,
-  REPEAT STRIP_TAC THEN ONCE_REWRITE_TAC[GSYM REAL_SUB_LE] THEN
-  MP_TAC(ISPECL
-   [`\x. (x + x pow 3 / &6 + x pow 5 / &120 + c * x pow 7 / &5040) -
-         (exp x - exp(--x)) / &2`;
-    `\x. (&1 + x pow 2 / &2 + x pow 4 / &24 + c * x pow 6 / &720) -
-         (exp x + exp(--x)) / &2`;
-    `{y:real | &0 <= y /\ y <= b}`; `&0`; `x:real`]
-   HAS_REAL_DERIVATIVE_INCREASING_IMP) THEN
-  REWRITE_TAC[IN_ELIM_THM; IS_REALINTERVAL_CLAUSES; REAL_LE_REFL] THEN
-  ASM_REWRITE_TAC[REAL_NEG_0; REAL_EXP_0] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  REWRITE_TAC[REAL_MUL_RZERO] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
-  DISCH_THEN MATCH_MP_TAC THEN REPEAT CONJ_TAC THEN
-  TRY ASM_REAL_ARITH_TAC THEN X_GEN_TAC `y:real` THEN STRIP_TAC THENL
-   [MATCH_MP_TAC HAS_REAL_DERIVATIVE_ATREAL_WITHIN THEN REAL_DIFF_TAC THEN
-    CONV_TAC NUM_REDUCE_CONV THEN REAL_ARITH_TAC;
-    MP_TAC(SPECL [`b:real`; `c:real`; `y:real`] COSH_LE_SEXTIC_BOUND) THEN
-    ANTS_TAC THENL [ASM_REAL_ARITH_TAC; REAL_ARITH_TAC]]);;
-
-(* ------------------------------------------------------------------------- *)
-(* cosh(3927/2500) <= 63/25, by exact rational arithmetic: e^y <=           *)
-(* (2 + y)/(2 - y) at y = 3927/80000 to the 32nd power, and the cubic Taylor *)
-(* bound on e^(3927/20000) to the 8th power for e^-(3927/2500).             *)
-(* ------------------------------------------------------------------------- *)
-
-let REAL_EXP_3927_2500_LE = prove
- (`exp(&3927 / &2500) <=
-   ((&1 + &3927 / &160000) / (&1 - &3927 / &160000)) pow 32`,
-  SUBGOAL_THEN `&3927 / &2500 = &32 * &2 * &3927 / &160000`
-   (fun th -> GEN_REWRITE_TAC (LAND_CONV o RAND_CONV) [th]) THENL
-   [CONV_TAC REAL_RAT_REDUCE_CONV; ALL_TAC] THEN
-  ONCE_REWRITE_TAC[REAL_EXP_N] THEN MATCH_MP_TAC REAL_POW_LE2 THEN
-  REWRITE_TAC[REAL_EXP_POS_LE] THEN MATCH_MP_TAC REAL_EXP_DOUBLE_LE THEN
-  CONV_TAC REAL_RAT_REDUCE_CONV);;
-
-let REAL_EXP_NEG_3927_2500_LE = prove
- (`exp(--(&3927 / &2500)) <=
-   inv((&1 + &3927 / &20000 + (&3927 / &20000) pow 2 / &2 +
-        (&3927 / &20000) pow 3 / &6) pow 8)`,
-  REWRITE_TAC[REAL_EXP_NEG] THEN
-  MATCH_MP_TAC REAL_LE_INV2 THEN CONJ_TAC THENL
-   [CONV_TAC REAL_RAT_REDUCE_CONV; ALL_TAC] THEN
-  SUBGOAL_THEN `&3927 / &2500 = &8 * &3927 / &20000` SUBST1_TAC THENL
-   [CONV_TAC REAL_RAT_REDUCE_CONV; ALL_TAC] THEN
-  ONCE_REWRITE_TAC[REAL_EXP_N] THEN MATCH_MP_TAC REAL_POW_LE2 THEN
-  CONJ_TAC THENL [CONV_TAC REAL_RAT_REDUCE_CONV; ALL_TAC] THEN
-  MATCH_MP_TAC REAL_EXP_CUBIC_LE THEN CONV_TAC REAL_RAT_REDUCE_CONV);;
 
 let COSH_3927_2500_LE = prove
- (`(exp(&3927 / &2500) + exp(--(&3927 / &2500))) / &2 <= &63 / &25`,
-  MP_TAC REAL_EXP_3927_2500_LE THEN MP_TAC REAL_EXP_NEG_3927_2500_LE THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN REAL_ARITH_TAC);;
+ (`(exp(&3927 / &2500) + inv(exp(&3927 / &2500))) / &2 <= &63 / &25`,
+  MP_TAC(SPECL [`32`; `&3927 / &2500`] REAL_EXP_LE_RATIO_POW) THEN
+  MP_TAC(SPECL [`3`; `8`; `&3927 / &2500`] REAL_EXP_GE_PARTIAL_SUM_POW) THEN
+  CONV_TAC(ONCE_DEPTH_CONV EXPAND_SUM_CONV THENC DEPTH_CONV BETA_CONV THENC
+           DEPTH_CONV NUM_FACT_CONV THENC
+           ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
+  REWRITE_TAC[] THEN
+  MATCH_MP_TAC(prove
+   (`!a b e c. &0 < a /\ (b + inv a) / &2 <= c
+               ==> a <= e ==> e <= b ==> (e + inv e) / &2 <= c`,
+    REPEAT STRIP_TAC THEN MP_TAC(SPECL [`a:real`; `e:real`] REAL_LE_INV2) THEN
+    ASM_REWRITE_TAC[] THEN ASM_REAL_ARITH_TAC)) THEN
+  CONV_TAC REAL_RAT_REDUCE_CONV);;
 
 (* ------------------------------------------------------------------------- *)
 (* x cos x <= x^3 / sinh^2 x <= x cos^2(x/2) <= sin x <= (x cos x + 2x)/3    *)
@@ -1091,9 +660,17 @@ let MUL_COS_LE_SIN_SMALL = prove
   REPEAT STRIP_TAC THEN
   TRANS_TAC REAL_LE_TRANS `y * (&1 - y pow 2 / &2 + y pow 4 / &24)` THEN
   CONJ_TAC THENL
-   [MATCH_MP_TAC REAL_LE_LMUL THEN ASM_SIMP_TAC[COS_LE_QUARTIC]; ALL_TAC] THEN
+   [MATCH_MP_TAC REAL_LE_LMUL THEN ASM_REWRITE_TAC[] THEN
+    MP_TAC(CONJUNCT2(EXPAND_PARTIAL_SUM_RULE
+      (SPECL [`1`; `y:real`] COS_TAYLOR_BOUNDS))) THEN
+    REAL_ARITH_TAC;
+    ALL_TAC] THEN
   TRANS_TAC REAL_LE_TRANS `y - y pow 3 / &6` THEN
-  ASM_SIMP_TAC[SIN_GE_CUBIC] THEN
+  CONJ_TAC THENL
+   [ALL_TAC;
+    MP_TAC(EXPAND_PARTIAL_SUM_RULE
+             (SPECL [`0`; `y:real`] SIN_TAYLOR_BOUNDS)) THEN
+    ASM_REWRITE_TAC[] THEN REAL_ARITH_TAC] THEN
   MP_TAC(SPECL [`y:real`; `3`] REAL_POW_LE) THEN ASM_REWRITE_TAC[] THEN
   DISCH_TAC THEN
   MP_TAC(SPECL [`(y:real) pow 3`; `&8 - y pow 2`] REAL_LE_MUL) THEN
@@ -1137,7 +714,11 @@ let SIN_LE_CUSA_SMALL = prove
  (`!x. &0 <= x /\ x pow 2 <= &12 ==> sin x <= (x * cos x + &2 * x) / &3`,
   REPEAT STRIP_TAC THEN
   TRANS_TAC REAL_LE_TRANS `x - x pow 3 / &6 + x pow 5 / &120` THEN
-  ASM_SIMP_TAC[SIN_LE_QUINTIC] THEN
+  CONJ_TAC THENL
+   [MP_TAC(EXPAND_PARTIAL_SUM_RULE
+             (SPECL [`1`; `x:real`] SIN_TAYLOR_BOUNDS)) THEN
+    ASM_REWRITE_TAC[] THEN REAL_ARITH_TAC;
+    ALL_TAC] THEN
   TRANS_TAC REAL_LE_TRANS
    `(x * (&1 - x pow 2 / &2 + x pow 4 / &24 - x pow 6 / &720) + &2 * x) /
     &3` THEN
@@ -1147,7 +728,10 @@ let SIN_LE_CUSA_SMALL = prove
     MP_TAC(SPECL [`(x:real) pow 5`; `&12 - x pow 2`] REAL_LE_MUL) THEN
     ANTS_TAC THENL [ASM_REAL_ARITH_TAC; REAL_ARITH_TAC];
     MATCH_MP_TAC(REAL_ARITH `a <= b ==> (a + c) / &3 <= (b + c) / &3`) THEN
-    MATCH_MP_TAC REAL_LE_LMUL THEN ASM_SIMP_TAC[COS_GE_SEXTIC]]);;
+    MATCH_MP_TAC REAL_LE_LMUL THEN ASM_REWRITE_TAC[] THEN
+    MP_TAC(CONJUNCT1(EXPAND_PARTIAL_SUM_RULE
+      (SPECL [`1`; `x:real`] COS_TAYLOR_BOUNDS))) THEN
+    REAL_ARITH_TAC]);;
 
 let SIN_LE_CUSA = prove
  (`!x. &0 <= x ==> sin x <= (x * cos x + &2 * x) / &3`,
@@ -1167,17 +751,17 @@ let SIN_LE_CUSA = prove
 
 let COS_MUL_SINH_SQUARE_LE = prove
  (`!x. abs x <= &3927 / &2500
-       ==> cos x * ((exp x - exp(--x)) / &2) pow 2 <= x pow 2`,
+       ==> cos x * ((exp x - inv(exp x)) / &2) pow 2 <= x pow 2`,
   SUBGOAL_THEN
    `!x. &0 <= x /\ x <= &3927 / &2500
-        ==> cos x * ((exp x - exp(--x)) / &2) pow 2 <= x pow 2`
+        ==> cos x * ((exp x - inv(exp x)) / &2) pow 2 <= x pow 2`
   ASSUME_TAC THENL
    [ALL_TAC;
     REPEAT STRIP_TAC THEN
     DISJ_CASES_TAC(SPECL [`&0`; `x:real`] REAL_LE_TOTAL) THENL
      [FIRST_X_ASSUM(MP_TAC o SPEC `x:real`);
       FIRST_X_ASSUM(MP_TAC o SPEC `--x:real`)] THEN
-    REWRITE_TAC[COS_NEG; REAL_NEG_NEG; REAL_POW_NEG; ARITH] THEN
+    REWRITE_TAC[COS_NEG; SINH_NEG; REAL_NEG_NEG; REAL_POW_NEG; ARITH] THEN
     (ANTS_TAC THENL [ASM_REAL_ARITH_TAC; REAL_ARITH_TAC])] THEN
   REPEAT STRIP_TAC THEN ASM_CASES_TAC `cos x <= &0` THENL
    [MATCH_MP_TAC(REAL_ARITH `a <= &0 /\ &0 <= b ==> a <= b`) THEN
@@ -1190,12 +774,22 @@ let COS_MUL_SINH_SQUARE_LE = prove
      [MATCH_MP_TAC REAL_POW_LE2 THEN ASM_REWRITE_TAC[];
       CONV_TAC REAL_RAT_REDUCE_CONV];
     ALL_TAC] THEN
-  MP_TAC(SPECL [`&3927 / &2500`; `&63 / &25`; `x:real`]
-               SINH_LE_SEPTIC_BOUND) THEN
-  ASM_REWRITE_TAC[COSH_3927_2500_LE] THEN DISCH_TAC THEN
-  MP_TAC(SPEC `x:real` COS_LE_QUARTIC) THEN
-  MP_TAC(SPEC `x:real` SINH_GE_X) THEN ASM_REWRITE_TAC[] THEN
-  REPEAT DISCH_TAC THEN
+  SUBGOAL_THEN
+   `(exp x - inv(exp x)) / &2 <=
+    x + x pow 3 / &6 + x pow 5 / &120 + &63 / &25 * x pow 7 / &5040`
+  ASSUME_TAC THENL
+   [MP_TAC(EXPAND_PARTIAL_SUM_RULE
+     (SPECL [`2`; `&3927 / &2500`; `&63 / &25`; `x:real`]
+            SINH_TAYLOR_UPPER)) THEN
+    ASM_REWRITE_TAC[COSH_3927_2500_LE] THEN REAL_ARITH_TAC;
+    ALL_TAC] THEN
+  SUBGOAL_THEN `cos x <= &1 - x pow 2 / &2 + x pow 4 / &24` ASSUME_TAC THENL
+   [MP_TAC(CONJUNCT2(EXPAND_PARTIAL_SUM_RULE
+     (SPECL [`1`; `x:real`] COS_TAYLOR_BOUNDS))) THEN
+    REAL_ARITH_TAC;
+    ALL_TAC] THEN
+  MP_TAC(SPEC `x:real` REAL_LE_X_SINH) THEN ASM_REWRITE_TAC[] THEN
+  DISCH_TAC THEN
   TRANS_TAC REAL_LE_TRANS
    `(&1 - x pow 2 / &2 + x pow 4 / &24) *
     (x + x pow 3 / &6 + x pow 5 / &120 + &63 / &25 * x pow 7 / &5040)
@@ -1219,17 +813,29 @@ let COS_MUL_SINH_SQUARE_LE = prove
 
 let SINH_MUL_COS_HALF_GE = prove
  (`!x. &0 <= x /\ x <= &3927 / &2500
-       ==> x <= (exp x - exp(--x)) / &2 * cos(x / &2)`,
+       ==> x <= (exp x - inv(exp x)) / &2 * cos(x / &2)`,
   REPEAT STRIP_TAC THEN
   SUBGOAL_THEN `x pow 2 <= &15421329 / &6250000` ASSUME_TAC THENL
    [TRANS_TAC REAL_LE_TRANS `(&3927 / &2500) pow 2` THEN CONJ_TAC THENL
      [MATCH_MP_TAC REAL_POW_LE2 THEN ASM_REWRITE_TAC[];
       CONV_TAC REAL_RAT_REDUCE_CONV];
     ALL_TAC] THEN
-  MP_TAC(SPEC `x / &2` COS_GE_SEXTIC) THEN
-  MP_TAC(SPEC `x:real` SINH_GE_QUINTIC) THEN
-  ASM_SIMP_TAC[REAL_LE_DIV; REAL_POS] THEN REWRITE_TAC[REAL_POW_DIV] THEN
-  CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN REPEAT DISCH_TAC THEN
+  SUBGOAL_THEN
+   `&1 - x pow 2 / &8 + x pow 4 / &384 - x pow 6 / &46080 <= cos(x / &2)`
+  MP_TAC THENL
+   [MP_TAC(CONJUNCT1(EXPAND_PARTIAL_SUM_RULE
+     (SPECL [`1`; `x / &2`] COS_TAYLOR_BOUNDS))) THEN
+    REWRITE_TAC[REAL_POW_DIV] THEN
+    CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN REAL_ARITH_TAC;
+    ALL_TAC] THEN
+  SUBGOAL_THEN
+   `x + x pow 3 / &6 + x pow 5 / &120 <= (exp x - inv(exp x)) / &2`
+  MP_TAC THENL
+   [MP_TAC(EXPAND_PARTIAL_SUM_RULE
+     (SPECL [`2`; `x:real`] SINH_TAYLOR_LOWER)) THEN
+    ASM_REWRITE_TAC[] THEN REAL_ARITH_TAC;
+    ALL_TAC] THEN
+  REPEAT DISCH_TAC THEN
   TRANS_TAC REAL_LE_TRANS
    `(x + x pow 3 / &6 + x pow 5 / &120) *
     (&1 - x pow 2 / &8 + x pow 4 / &384 - x pow 6 / &46080)` THEN
@@ -1244,10 +850,11 @@ let SINH_MUL_COS_HALF_GE = prove
     MP_TAC(SPECL [`x:real`; `9`] REAL_POW_LE) THEN
     MP_TAC(SPECL [`x:real`; `3`] REAL_POW_LE) THEN
     ASM_REWRITE_TAC[] THEN REPEAT DISCH_TAC THEN ASM_REAL_ARITH_TAC;
-    MATCH_MP_TAC REAL_LE_MUL2 THEN ASM_REWRITE_TAC[] THEN
-    CONJ_TAC THEN TRY(MATCH_MP_TAC REAL_LE_ADD THEN CONJ_TAC) THEN
-    ASM_SIMP_TAC[REAL_LE_ADD; REAL_LE_DIV; REAL_POW_LE; REAL_POS] THEN
-    CONJ_TAC THENL [ALL_TAC; ASM_REAL_ARITH_TAC] THEN
+    MATCH_MP_TAC REAL_LE_MUL2 THEN ASM_REWRITE_TAC[] THEN CONJ_TAC THENL
+     [MP_TAC(SPECL [`x:real`; `3`] REAL_POW_LE) THEN
+      MP_TAC(SPECL [`x:real`; `5`] REAL_POW_LE) THEN
+      ASM_REWRITE_TAC[] THEN ASM_REAL_ARITH_TAC;
+      ALL_TAC] THEN
     MAP_EVERY (fun t -> MP_TAC(SPECL [t; `&15421329 / &6250000 - x pow 2`]
                                      REAL_LE_MUL) THEN
                         ANTS_TAC THENL
@@ -1259,18 +866,29 @@ let SINH_MUL_COS_HALF_GE = prove
 
 let SINH_MUL_COS_ADD_2_LE = prove
  (`!x. &0 <= x /\ x <= &3927 / &2500
-       ==> (exp x - exp(--x)) / &2 * (cos x + &2) <= &3 * x`,
+       ==> (exp x - inv(exp x)) / &2 * (cos x + &2) <= &3 * x`,
   REPEAT STRIP_TAC THEN
   SUBGOAL_THEN `x pow 2 <= &15421329 / &6250000` ASSUME_TAC THENL
    [TRANS_TAC REAL_LE_TRANS `(&3927 / &2500) pow 2` THEN CONJ_TAC THENL
      [MATCH_MP_TAC REAL_POW_LE2 THEN ASM_REWRITE_TAC[];
       CONV_TAC REAL_RAT_REDUCE_CONV];
     ALL_TAC] THEN
-  MP_TAC(SPECL [`&3927 / &2500`; `&63 / &25`; `x:real`]
-               SINH_LE_SEPTIC_BOUND) THEN
-  ASM_REWRITE_TAC[COSH_3927_2500_LE] THEN DISCH_TAC THEN
-  MP_TAC(SPEC `x:real` COS_LE_QUARTIC) THEN
-  MP_TAC(SPEC `x:real` SINH_GE_X) THEN MP_TAC(SPEC `x:real` COS_BOUND) THEN
+  SUBGOAL_THEN
+   `(exp x - inv(exp x)) / &2 <=
+    x + x pow 3 / &6 + x pow 5 / &120 + &63 / &25 * x pow 7 / &5040`
+  ASSUME_TAC THENL
+   [MP_TAC(EXPAND_PARTIAL_SUM_RULE
+     (SPECL [`2`; `&3927 / &2500`; `&63 / &25`; `x:real`]
+            SINH_TAYLOR_UPPER)) THEN
+    ASM_REWRITE_TAC[COSH_3927_2500_LE] THEN REAL_ARITH_TAC;
+    ALL_TAC] THEN
+  SUBGOAL_THEN `cos x <= &1 - x pow 2 / &2 + x pow 4 / &24` MP_TAC THENL
+   [MP_TAC(CONJUNCT2(EXPAND_PARTIAL_SUM_RULE
+     (SPECL [`1`; `x:real`] COS_TAYLOR_BOUNDS))) THEN
+    REAL_ARITH_TAC;
+    ALL_TAC] THEN
+  MP_TAC(SPEC `x:real` REAL_LE_X_SINH) THEN
+  MP_TAC(SPEC `x:real` COS_BOUND) THEN
   ASM_REWRITE_TAC[] THEN REPEAT DISCH_TAC THEN
   TRANS_TAC REAL_LE_TRANS
    `(x + x pow 3 / &6 + x pow 5 / &120 + &63 / &25 * x pow 7 / &5040) *
@@ -1289,12 +907,12 @@ let SINH_MUL_COS_ADD_2_LE = prove
 
 let HYPERBOLIC_SINH_BOUNDS = prove
  (`!x. &0 <= x /\ x <= pi / &2
-       ==> x * cos x <= x pow 3 / ((exp x - exp(--x)) / &2) pow 2 /\
-           x pow 3 / ((exp x - exp(--x)) / &2) pow 2
+       ==> x * cos x <= x pow 3 / ((exp x - inv(exp x)) / &2) pow 2 /\
+           x pow 3 / ((exp x - inv(exp x)) / &2) pow 2
            <= x * cos(x / &2) pow 2 /\
            x * cos(x / &2) pow 2 <= sin x /\
            sin x <= (x * cos x + &2 * x) / &3 /\
-           (x * cos x + &2 * x) / &3 <= x pow 2 / ((exp x - exp(--x)) / &2)`,
+           (x * cos x + &2 * x) / &3 <= x pow 2 / ((exp x - inv(exp x)) / &2)`,
   REPEAT GEN_TAC THEN STRIP_TAC THEN
   MP_TAC(SPEC `x:real` HALF_PI_SQUARE_COS_POS) THEN
   ASM_REWRITE_TAC[] THEN STRIP_TAC THEN
@@ -1302,7 +920,7 @@ let HYPERBOLIC_SINH_BOUNDS = prove
    [MP_TAC PI_BOUNDS_3927 THEN ASM_REAL_ARITH_TAC; ALL_TAC] THEN
   ASM_SIMP_TAC[MUL_COS_HALF_SQUARE_LE_SIN; SIN_LE_CUSA] THEN
   ASM_CASES_TAC `x = &0` THENL
-   [ASM_REWRITE_TAC[REAL_NEG_0; REAL_SUB_REFL; COS_0] THEN
+   [ASM_REWRITE_TAC[REAL_EXP_0; REAL_INV_1; REAL_SUB_REFL; COS_0] THEN
     CONV_TAC(ONCE_DEPTH_CONV REAL_RAT_REDUCE_CONV) THEN
     REWRITE_TAC[real_div; REAL_MUL_LZERO; REAL_LE_REFL];
     ALL_TAC] THEN
@@ -1311,8 +929,8 @@ let HYPERBOLIC_SINH_BOUNDS = prove
   MP_TAC(SPEC `x:real` COS_MUL_SINH_SQUARE_LE) THEN
   MP_TAC(SPEC `x:real` SINH_MUL_COS_HALF_GE) THEN
   MP_TAC(SPEC `x:real` SINH_MUL_COS_ADD_2_LE) THEN
-  MP_TAC(SPEC `x:real` SINH_GE_X) THEN ASM_SIMP_TAC[REAL_LT_IMP_LE] THEN
-  SPEC_TAC(`(exp x - exp(--x)) / &2`,`s:real`) THEN
+  MP_TAC(SPEC `x:real` REAL_LE_X_SINH) THEN ASM_SIMP_TAC[REAL_LT_IMP_LE] THEN
+  SPEC_TAC(`(exp x - inv(exp x)) / &2`,`s:real`) THEN
   GEN_TAC THEN REPEAT DISCH_TAC THEN
   SUBGOAL_THEN `&0 < s /\ &0 < s pow 2` STRIP_ASSUME_TAC THENL
    [CONJ_TAC THENL
@@ -1397,7 +1015,8 @@ let SIN_DIV_GE_REDHEFFER = prove
   CONJ_TAC THENL
    [ALL_TAC;
     ASM_SIMP_TAC[REAL_LE_RDIV_EQ] THEN
-    MP_TAC(SPEC `x:real` SIN_GE_SEPTIC) THEN
+    MP_TAC(EXPAND_PARTIAL_SUM_RULE
+             (SPECL [`1`; `x:real`] SIN_TAYLOR_BOUNDS)) THEN
     ANTS_TAC THENL [ASM_REAL_ARITH_TAC; REAL_ARITH_TAC]] THEN
   SUBGOAL_THEN `&0 < pi pow 2 + x pow 2` ASSUME_TAC THENL
    [MP_TAC(SPEC `x:real` REAL_LE_POW_2) THEN

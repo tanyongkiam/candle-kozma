@@ -7,6 +7,150 @@ needs "Library/binomial.ml";;
 needs "kozma/finite_sums.ml";;
 
 (* ------------------------------------------------------------------------- *)
+(* Families of subsets: a family of subsets of a finite set is finite (the   *)
+(* family form of FINITE_RESTRICTED_SUBSETS), and x |-> a INSERT x is        *)
+(* injective on sets not containing a.                                       *)
+(* ------------------------------------------------------------------------- *)
+
+let FINITE_SET_OF_SUBSETS = prove
+ (`!(A:(A->bool)->bool) s.
+     FINITE s /\ (!x. x IN A ==> x SUBSET s) ==> FINITE A`,
+  REPEAT STRIP_TAC THEN MATCH_MP_TAC FINITE_SUBSET THEN
+  EXISTS_TAC `{x:A->bool | x SUBSET s}` THEN
+  ASM_SIMP_TAC[FINITE_POWERSET; SUBSET; IN_ELIM_THM]);;
+
+let INSERT_INJ = prove
+ (`!(a:A) x y. ~(a IN x) /\ ~(a IN y) ==> (a INSERT x = a INSERT y <=> x = y)`,
+  SET_TAC[]);;
+
+(* ------------------------------------------------------------------------- *)
+(* The (k+1)-subsets of x INSERT s for x not in s: those of s, and x added   *)
+(* to the k-subsets of s. Library/binomial.ml proves this only as a local    *)
+(* lemma.                                                                    *)
+(* ------------------------------------------------------------------------- *)
+
+let RESTRICTED_POWERSET_INSERT_SUC = prove
+ (`!s:A->bool x k.
+     ~(x IN s)
+     ==> {t | t SUBSET (x INSERT s) /\ t HAS_SIZE (SUC k)} =
+         {t | t SUBSET s /\ t HAS_SIZE (SUC k)} UNION
+         IMAGE (\t. x INSERT t) {t | t SUBSET s /\ t HAS_SIZE k}`,
+  REPEAT STRIP_TAC THEN GEN_REWRITE_TAC I[EXTENSION] THEN
+  X_GEN_TAC `u:A->bool` THEN REWRITE_TAC[IN_UNION; IN_ELIM_THM; IN_IMAGE] THEN
+  EQ_TAC THENL
+   [STRIP_TAC THEN ASM_CASES_TAC `(x:A) IN u` THENL
+     [DISJ2_TAC THEN EXISTS_TAC `u DELETE (x:A)` THEN CONJ_TAC THENL
+       [ASM SET_TAC[];
+        ALL_TAC] THEN CONJ_TAC THENL [ASM SET_TAC[]; ALL_TAC] THEN
+      UNDISCH_TAC `(u:A->bool) HAS_SIZE SUC k` THEN
+      SIMP_TAC[HAS_SIZE; FINITE_DELETE; CARD_DELETE] THEN
+      ASM_REWRITE_TAC[] THEN ARITH_TAC;
+      DISJ1_TAC THEN ASM_REWRITE_TAC[] THEN ASM SET_TAC[]];
+    DISCH_THEN(DISJ_CASES_THEN2 STRIP_ASSUME_TAC(X_CHOOSE_THEN `t:A->bool`
+          STRIP_ASSUME_TAC)) THENL
+     [ASM_REWRITE_TAC[] THEN ASM SET_TAC[];
+      ASM_REWRITE_TAC[] THEN CONJ_TAC THENL [ASM SET_TAC[]; ALL_TAC] THEN
+      REWRITE_TAC[HAS_SIZE_CLAUSES] THEN
+      MAP_EVERY EXISTS_TAC[`x:A`; `t:A->bool`] THEN ASM_REWRITE_TAC[] THEN
+      ASM SET_TAC[]]]);;
+
+(* ------------------------------------------------------------------------- *)
+(* Expansion of a product of sums over the subsets of the index set:         *)
+(* prod_s (a + b) = sum_(t SUBSET s) prod_(s DIFF t) a prod_t b. This is     *)
+(* PRODUCT_ADD_SUBSETS of HOL Light's Sieve/gt_counting.ml, which Candle's   *)
+(* library does not contain. Replace this local copy by the library theorem  *)
+(* once Candle's library includes it.                                        *)
+(* ------------------------------------------------------------------------- *)
+
+let PRODUCT_ADD_SUM_SUBSETS = prove
+ (`!(a:A->real) b s.
+        FINITE s
+        ==> product s (\x. a x + b x) =
+            sum {t | t SUBSET s} (\t. product (s DIFF t) a * product t b)`,
+  GEN_TAC THEN GEN_TAC THEN MATCH_MP_TAC FINITE_INDUCT_STRONG THEN
+  CONJ_TAC THENL
+   [REWRITE_TAC[PRODUCT_CLAUSES; SUBSET_EMPTY; SING_GSPEC; SUM_SING;
+                EMPTY_DIFF] THEN REAL_ARITH_TAC;
+    ALL_TAC] THEN
+  MAP_EVERY X_GEN_TAC [`x:A`; `s:A->bool`] THEN STRIP_TAC THEN
+  ASM_SIMP_TAC[PRODUCT_CLAUSES; POWERSET_CLAUSES] THEN
+  W(MP_TAC o PART_MATCH (lhand o rand) SUM_UNION o rand o snd) THEN
+  ASM_SIMP_TAC[FINITE_POWERSET; FINITE_IMAGE] THEN ANTS_TAC THENL
+   [REWRITE_TAC[DISJOINT; EXTENSION; IN_INTER; IN_IMAGE; IN_ELIM_THM;
+                NOT_IN_EMPTY] THEN ASM SET_TAC[];
+    DISCH_THEN SUBST1_TAC] THEN
+  W(MP_TAC o PART_MATCH (lhand o rand) SUM_IMAGE o rand o rand o snd) THEN
+  ANTS_TAC THENL
+   [REWRITE_TAC[IN_ELIM_THM] THEN ASM SET_TAC[]; DISCH_THEN SUBST1_TAC] THEN
+  REWRITE_TAC[o_DEF] THEN
+  SUBGOAL_THEN
+   `!t. t SUBSET s
+        ==> product ((x:A) INSERT s DIFF t) a = a x * product (s DIFF t) a /\
+            product ((x INSERT s) DIFF (x INSERT t)) a =
+            product (s DIFF t) a /\
+            product (x INSERT t) b = b x * product t b`
+  ASSUME_TAC THENL
+   [REPEAT STRIP_TAC THENL
+     [SUBGOAL_THEN `(x:A) INSERT s DIFF t = x INSERT (s DIFF t)` SUBST1_TAC
+      THENL [ASM SET_TAC[]; ALL_TAC] THEN
+      ASM_SIMP_TAC[PRODUCT_CLAUSES; FINITE_DIFF; IN_DIFF];
+      AP_THM_TAC THEN AP_TERM_TAC THEN ASM SET_TAC[];
+      SUBGOAL_THEN `~((x:A) IN t)` ASSUME_TAC THENL [ASM SET_TAC[];
+       ALL_TAC] THEN
+      ASM_MESON_TAC[PRODUCT_CLAUSES; FINITE_SUBSET]];
+    ALL_TAC] THEN
+  SUBGOAL_THEN
+   `sum {t | t SUBSET s}
+        (\t. product ((x:A) INSERT s DIFF t) a * product t b) =
+    a x * sum {t | t SUBSET s} (\t. product (s DIFF t) a * product t b) /\
+    sum {t | t SUBSET s}
+        (\t. product ((x INSERT s) DIFF (x INSERT t)) a *
+             product (x INSERT t) b) =
+    b x * sum {t | t SUBSET s} (\t. product (s DIFF t) a * product t b)`
+  (CONJUNCTS_THEN SUBST1_TAC) THENL
+   [REWRITE_TAC[GSYM SUM_LMUL] THEN CONJ_TAC THEN MATCH_MP_TAC SUM_EQ THEN
+    REWRITE_TAC[IN_ELIM_THM] THEN REPEAT STRIP_TAC THEN ASM_SIMP_TAC[] THEN
+    REAL_ARITH_TAC;
+    MATCH_ACCEPT_TAC REAL_ADD_RDISTRIB]);;
+
+(* ------------------------------------------------------------------------- *)
+(* Binomial coefficients: k! C(n,k) is the falling factorial, C(m,k) is      *)
+(* increasing in m, and Pascal's rule for the partial sums of a row.         *)
+(* ------------------------------------------------------------------------- *)
+
+let BINOM_FALLING_FACTORIAL = prove
+ (`!n k. &(FACT k) * &(binom(n,k)) = product(1..k) (\i. &n - &i + &1)`,
+  GEN_TAC THEN INDUCT_TAC THEN
+  REWRITE_TAC[FACT; binom; PRODUCT_CLAUSES_NUMSEG] THEN
+  CONV_TAC NUM_REDUCE_CONV THENL
+   [REAL_ARITH_TAC;
+    REWRITE_TAC[ARITH_RULE `1 <= SUC k`] THEN
+    FIRST_X_ASSUM(SUBST1_TAC o SYM) THEN
+    REWRITE_TAC[ADD1; BINOM_BOTTOM_STEP_REAL] THEN
+    REWRITE_TAC[GSYM REAL_OF_NUM_MUL; GSYM REAL_OF_NUM_ADD] THEN
+    CONV_TAC REAL_FIELD]);;
+
+let BINOM_MONO = prove
+ (`!m n k. m <= n ==> binom(m,k) <= binom(n,k)`,
+  SUBGOAL_THEN `!n k. binom(n,k) <= binom(SUC n,k)` ASSUME_TAC THENL
+   [GEN_TAC THEN INDUCT_TAC THEN REWRITE_TAC[binom; LE_REFL] THEN ARITH_TAC;
+    ALL_TAC] THEN
+  REPEAT GEN_TAC THEN GEN_REWRITE_TAC LAND_CONV [LE_EXISTS] THEN
+  DISCH_THEN(X_CHOOSE_THEN `d:num` SUBST1_TAC) THEN
+  SPEC_TAC(`d:num`,`d:num`) THEN INDUCT_TAC THEN
+  REWRITE_TAC[ADD_CLAUSES; LE_REFL] THEN
+  TRANS_TAC LE_TRANS `binom(m + d,k)` THEN ASM_REWRITE_TAC[]);;
+
+let NSUM_BINOM_PASCAL = prove
+ (`!n d. nsum(0..SUC d) (\i. binom(SUC n,i)) =
+         nsum(0..SUC d) (\i. binom(n,i)) + nsum(0..d) (\i. binom(n,i))`,
+  REPEAT GEN_TAC THEN
+  REWRITE_TAC[MATCH_MP (SPEC_ALL NSUM_CLAUSES_LEFT)
+                       (ARITH_RULE `0 <= SUC d`)] THEN
+  REWRITE_TAC[ADD1; NSUM_OFFSET] THEN
+  REWRITE_TAC[GSYM ADD1; binom; NSUM_ADD_NUMSEG] THEN ARITH_TAC);;
+
+(* ------------------------------------------------------------------------- *)
 (* A family of subsets of a INSERT t splits into the members avoiding a and  *)
 (* the members containing a, the latter with a removed.                      *)
 (* ------------------------------------------------------------------------- *)
@@ -33,10 +177,7 @@ let CARD_FAMILY_SPLIT_INSERT = prove
       DISJ1_TAC THEN ASM SET_TAC[]];
     ALL_TAC] THEN
   SUBGOAL_THEN `!P. FINITE {x:A->bool | x SUBSET t /\ P x}` ASSUME_TAC THENL
-   [GEN_TAC THEN MATCH_MP_TAC FINITE_SUBSET THEN
-    EXISTS_TAC `{x:A->bool | x SUBSET t}` THEN
-    ASM_SIMP_TAC[FINITE_POWERSET] THEN SET_TAC[];
-    ALL_TAC] THEN
+   [ASM_SIMP_TAC[FINITE_RESTRICTED_SUBSETS]; ALL_TAC] THEN
   MP_TAC(ISPECL
    [`{x:A->bool | x SUBSET t /\ x IN A}`;
     `IMAGE (\x:A->bool. a INSERT x) {x | x SUBSET t /\ (a INSERT x) IN A}`]
@@ -49,9 +190,7 @@ let CARD_FAMILY_SPLIT_INSERT = prove
   AP_TERM_TAC THEN MATCH_MP_TAC CARD_IMAGE_INJ THEN
   ASM_REWRITE_TAC[IN_ELIM_THM] THEN
   MAP_EVERY X_GEN_TAC [`x:A->bool`; `y:A->bool`] THEN STRIP_TAC THEN
-  UNDISCH_TAC `(a:A) INSERT x = a INSERT y` THEN
-  REWRITE_TAC[EXTENSION; IN_INSERT] THEN
-  RULE_ASSUM_TAC(REWRITE_RULE[SUBSET]) THEN ASM_MESON_TAC[]);;
+  ASM_MESON_TAC[INSERT_INJ; SUBSET]);;
 
 (* ------------------------------------------------------------------------- *)
 (* FKG inequality for set systems: two up-sets (or two down-sets) in the     *)
@@ -114,10 +253,7 @@ let FKG_INEQUALITY = prove
     MP_TAC(ISPECL [`&a1 - &a0:real`; `&b1 - &b0:real`] REAL_LE_MUL) THEN
     ASM_REWRITE_TAC[REAL_SUB_LE] THEN ASM_REAL_ARITH_TAC)) THEN
   SUBGOAL_THEN `!P. FINITE {x:A->bool | x SUBSET t /\ P x}` ASSUME_TAC THENL
-   [GEN_TAC THEN MATCH_MP_TAC FINITE_SUBSET THEN
-    EXISTS_TAC `{x:A->bool | x SUBSET t}` THEN
-    ASM_SIMP_TAC[FINITE_POWERSET] THEN SET_TAC[];
-    ALL_TAC] THEN
+   [ASM_SIMP_TAC[FINITE_RESTRICTED_SUBSETS]; ALL_TAC] THEN
   MP_TAC(SET_RULE `!x t. x SUBSET t ==> x SUBSET (a:A) INSERT t`) THEN
   MP_TAC(SET_RULE `!x y. x SUBSET y ==> (a:A) INSERT x SUBSET a INSERT y`) THEN
   MP_TAC(SET_RULE `!x. x SUBSET (a:A) INSERT x`) THEN
@@ -150,14 +286,12 @@ let FKG_INEQUALITY_ALT = prove
                             CARD(IMAGE (\x. s DIFF x) C) = CARD C`
   ASSUME_TAC THENL
    [REPEAT STRIP_TAC THENL
-     [MATCH_MP_TAC FINITE_SUBSET THEN
-      EXISTS_TAC `{x:A->bool | x SUBSET s}` THEN
-      ASM_SIMP_TAC[FINITE_POWERSET] THEN ASM SET_TAC[];
+     [MATCH_MP_TAC FINITE_SET_OF_SUBSETS THEN EXISTS_TAC `s:A->bool` THEN
+      ASM_REWRITE_TAC[];
       MATCH_MP_TAC CARD_IMAGE_INJ THEN CONJ_TAC THENL
        [ASM SET_TAC[];
-        MATCH_MP_TAC FINITE_SUBSET THEN
-        EXISTS_TAC `{x:A->bool | x SUBSET s}` THEN
-        ASM_SIMP_TAC[FINITE_POWERSET] THEN ASM SET_TAC[]]];
+        MATCH_MP_TAC FINITE_SET_OF_SUBSETS THEN EXISTS_TAC `s:A->bool` THEN
+        ASM_REWRITE_TAC[]]];
     ALL_TAC] THEN
   SUBGOAL_THEN
    `IMAGE (\x:A->bool. s DIFF x) A INTER IMAGE (\x. s DIFF x) B =
@@ -339,9 +473,8 @@ let LYM_INEQUALITY = prove
       REWRITE_TAC[SUM_CLAUSES; REAL_POS]];
     ALL_TAC] THEN
   SUBGOAL_THEN `FINITE(A:(A->bool)->bool)` ASSUME_TAC THENL
-   [MATCH_MP_TAC FINITE_SUBSET THEN EXISTS_TAC `{x:A->bool | x SUBSET s}` THEN
-    ASM_SIMP_TAC[FINITE_POWERSET] THEN GEN_REWRITE_TAC I [SUBSET] THEN
-    REWRITE_TAC[IN_ELIM_THM] THEN ASM_MESON_TAC[];
+   [MATCH_MP_TAC FINITE_SET_OF_SUBSETS THEN EXISTS_TAC `s:A->bool` THEN
+    ASM_MESON_TAC[];
     ALL_TAC] THEN
   SUBGOAL_THEN
    `!x:A->bool.
@@ -436,10 +569,8 @@ let SHATTERED_SUBSET = prove
 let FINITE_SHATTERED = prove
  (`!s (A:(A->bool)->bool).
      FINITE s /\ (!x. x IN A ==> x SUBSET s) ==> FINITE(shattered A)`,
-  REPEAT STRIP_TAC THEN MATCH_MP_TAC FINITE_SUBSET THEN
-  EXISTS_TAC `{x:A->bool | x SUBSET s}` THEN
-  ASM_SIMP_TAC[FINITE_POWERSET; SUBSET; IN_ELIM_THM] THEN
-  ASM_MESON_TAC[SHATTERED_SUBSET; SUBSET]);;
+  REPEAT STRIP_TAC THEN MATCH_MP_TAC FINITE_SET_OF_SUBSETS THEN
+  EXISTS_TAC `s:A->bool` THEN ASM_MESON_TAC[SHATTERED_SUBSET; SUBSET]);;
 
 (* ------------------------------------------------------------------------- *)
 (* Pajor's inequality: a set system has at most as many members as it        *)
@@ -476,10 +607,7 @@ let CARD_LE_SHATTERED = prove
   ABBREV_TAC `B0 = {x:A->bool | x SUBSET t /\ x IN A}` THEN
   ABBREV_TAC `B1 = {x:A->bool | x SUBSET t /\ (a INSERT x) IN A}` THEN
   SUBGOAL_THEN `!P. FINITE {x:A->bool | x SUBSET t /\ P x}` ASSUME_TAC THENL
-   [GEN_TAC THEN MATCH_MP_TAC FINITE_SUBSET THEN
-    EXISTS_TAC `{x:A->bool | x SUBSET t}` THEN
-    ASM_SIMP_TAC[FINITE_POWERSET] THEN SET_TAC[];
-    ALL_TAC] THEN
+   [ASM_SIMP_TAC[FINITE_RESTRICTED_SUBSETS]; ALL_TAC] THEN
   SUBGOAL_THEN
    `FINITE(B0:(A->bool)->bool) /\ FINITE(B1:(A->bool)->bool) /\
     (!x. x IN B0 UNION B1 ==> x SUBSET t) /\
@@ -546,9 +674,7 @@ let CARD_LE_SHATTERED = prove
       DISCH_THEN SUBST1_TAC] THEN
     AP_TERM_TAC THEN CONV_TAC SYM_CONV THEN MATCH_MP_TAC CARD_IMAGE_INJ THEN
     ASM_REWRITE_TAC[] THEN
-    ASM_MESON_TAC[SET_RULE
-     `!a:A x y t. ~(a IN t) /\ x SUBSET t /\ y SUBSET t /\
-                  a INSERT x = a INSERT y ==> x = y`];
+    ASM_MESON_TAC[INSERT_INJ; SUBSET];
     ALL_TAC] THEN
   MATCH_MP_TAC CARD_SUBSET THEN CONJ_TAC THENL
    [ALL_TAC;
@@ -617,12 +743,8 @@ let CARD_SUBSETS_CARD_LE = prove
   W(fun (_,w) -> MP_TAC(PART_MATCH (lhand o rand) CARD_UNION (lhand w))) THEN
   ANTS_TAC THENL
    [REPEAT CONJ_TAC THENL
-     [MATCH_MP_TAC FINITE_SUBSET THEN
-      EXISTS_TAC `{x:A->bool | x SUBSET s}` THEN
-      ASM_SIMP_TAC[FINITE_POWERSET] THEN SET_TAC[];
-      MATCH_MP_TAC FINITE_SUBSET THEN
-      EXISTS_TAC `{x:A->bool | x SUBSET s}` THEN
-      ASM_SIMP_TAC[FINITE_POWERSET] THEN SET_TAC[];
+     [ASM_SIMP_TAC[FINITE_RESTRICTED_SUBSETS];
+      ASM_SIMP_TAC[FINITE_RESTRICTED_SUBSETS];
       REWRITE_TAC[EXTENSION; IN_INTER; IN_ELIM_THM; NOT_IN_EMPTY] THEN
       ARITH_TAC];
     DISCH_THEN SUBST1_TAC] THEN
@@ -642,16 +764,7 @@ let CARD_SHATTERED_LE_NSUM_BINOM = prove
 
 let NSUM_BINOM_LE_POW = prove
  (`!n d. nsum(0..d) (\i. binom(n,i)) <= n EXP d + 1`,
-  SUBGOAL_THEN
-   `!n d. nsum(0..SUC d) (\i. binom(SUC n,i)) =
-          nsum(0..SUC d) (\i. binom(n,i)) + nsum(0..d) (\i. binom(n,i))`
-  ASSUME_TAC THENL
-   [REPEAT GEN_TAC THEN
-    REWRITE_TAC[MATCH_MP (SPEC_ALL NSUM_CLAUSES_LEFT)
-                         (ARITH_RULE `0 <= SUC d`)] THEN
-    REWRITE_TAC[ADD1; NSUM_OFFSET] THEN
-    REWRITE_TAC[GSYM ADD1; binom; NSUM_ADD_NUMSEG] THEN ARITH_TAC;
-    ALL_TAC] THEN
+  ASSUME_TAC NSUM_BINOM_PASCAL THEN
   SUBGOAL_THEN
    `!n k. n EXP SUC(SUC k) + n EXP SUC k + 1 <= (n + 1) EXP SUC(SUC k)`
   ASSUME_TAC THENL
@@ -924,9 +1037,7 @@ let SHEARER_STEP_TRACES = prove
      [MATCH_MP_TAC CARD_IMAGE_INJ THEN ASM_SIMP_TAC[FINITE_IMAGE] THEN
       MAP_EVERY X_GEN_TAC [`y:A->bool`; `z:A->bool`] THEN STRIP_TAC THEN
       SUBGOAL_THEN `(y:A->bool) SUBSET u /\ z SUBSET u` MP_TAC THENL
-       [ASM_SIMP_TAC[];
-        UNDISCH_TAC `(a:A) INSERT y = a INSERT z` THEN
-        UNDISCH_TAC `~((a:A) IN u)` THEN SET_TAC[]];
+       [ASM_SIMP_TAC[]; ASM_MESON_TAC[INSERT_INJ; SUBSET]];
       ALL_TAC] THEN
     MP_TAC(ISPECL
      [`IMAGE (\x:A->bool. g INTER x) A0`;
@@ -986,11 +1097,8 @@ let SHEARER_INEQUALITY_REAL = prove
   DISCH_THEN(CONJUNCTS_THEN2 (LABEL_TAC "ih") STRIP_ASSUME_TAC) THEN
   X_GEN_TAC `A:(A->bool)->bool` THEN STRIP_TAC THEN
   SUBGOAL_THEN `FINITE(A:(A->bool)->bool)` ASSUME_TAC THENL
-   [MATCH_MP_TAC FINITE_SUBSET THEN
-    EXISTS_TAC `{x:A->bool | x SUBSET a INSERT u}` THEN
-    ASM_SIMP_TAC[FINITE_POWERSET; FINITE_INSERT] THEN
-    GEN_REWRITE_TAC I [SUBSET] THEN REWRITE_TAC[IN_ELIM_THM] THEN
-    ASM_REWRITE_TAC[];
+   [MATCH_MP_TAC FINITE_SET_OF_SUBSETS THEN
+    EXISTS_TAC `(a:A) INSERT u` THEN ASM_REWRITE_TAC[FINITE_INSERT];
     ALL_TAC] THEN
   MP_TAC(ISPECL [`a:A`; `u:A->bool`; `A:(A->bool)->bool`]
     CARD_FAMILY_SPLIT_INSERT) THEN
@@ -1044,9 +1152,8 @@ let SHEARER_INEQUALITY_GEN = prove
      ==> CARD A EXP t <= nproduct k (\j. CARD {f j INTER x | x IN A})`,
   REPEAT GEN_TAC THEN STRIP_TAC THEN
   SUBGOAL_THEN `FINITE(A:(A->bool)->bool)` ASSUME_TAC THENL
-   [MATCH_MP_TAC FINITE_SUBSET THEN EXISTS_TAC `{x:A->bool | x SUBSET s}` THEN
-    ASM_SIMP_TAC[FINITE_POWERSET] THEN GEN_REWRITE_TAC I [SUBSET] THEN
-    REWRITE_TAC[IN_ELIM_THM] THEN ASM_REWRITE_TAC[];
+   [MATCH_MP_TAC FINITE_SET_OF_SUBSETS THEN EXISTS_TAC `s:A->bool` THEN
+    ASM_REWRITE_TAC[];
     ALL_TAC] THEN
   ASM_CASES_TAC `t = 0` THENL
    [UNDISCH_TAC

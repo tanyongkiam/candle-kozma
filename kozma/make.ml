@@ -10,6 +10,7 @@ needs "kozma/log_trig_sqrt.ml";;     (* Logarithm, trig, hyperbolic, sqrt  *)
 needs "kozma/means.ml";;             (* Means and weighted products        *)
 needs "kozma/binomial_entropy.ml";;  (* Binomials, Stirling, entropy       *)
 needs "kozma/convexity.ml";;         (* Convexity, majorization, integrals *)
+needs "kozma/matrix.ml";;            (* Hadamard, Schur                    *)
 needs "kozma/series.ml";;            (* Mathieu, Hilbert, Hardy            *)
 needs "kozma/probability_basic.ml";; (* Moments and tails, Bonferroni      *)
 needs "kozma/probability_concentration.ml";;

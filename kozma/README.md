@@ -19,7 +19,7 @@ Formal proofs of inequalities from László Kozma's sheet "Useful Inequalities"
 | `probability_basic.ml` | Moment and tail inequalities for one random variable, Bonferroni |
 | `probability_concentration.ml` | Concentration inequalities for sums of independent and k-wise independent random variables, and Azuma's inequality |
 | `probability_maximal.ml` | Planned: maximal inequalities, Janson and Lovász |
-| `matrix.ml` | Planned: matrix inequalities |
+| `matrix.ml` | Hadamard's inequality and Schur's inequality for the diagonal of a symmetric matrix |
 
 To load all files:
 
@@ -223,12 +223,12 @@ Range hypotheses hold almost surely.
 | Lovász 1 | planned | |
 | Lovász 2 | planned | |
 
-### Matrices (`matrix.ml`, planned)
+### Matrices (`matrix.ml`)
 
 | Entry | Theorems | Remarks |
 |---|---|---|
-| Hadamard | planned | |
-| Schur 1 | planned | |
-| Schur 2 | planned | |
+| Hadamard | `HADAMARD_INEQUALITY` | As printed, for any real n by n matrix. |
+| Schur 1 | deferred | Needs complex matrices and their eigenvalues, which the library lacks. |
+| Schur 2 | `SCHUR_DIAGONAL_INEQUALITY`, `SCHUR_DIAGONAL_INEQUALITY_GEN`, `SYMMETRIC_MATRIX_DIAGONALIZABLE_SORTED`, `DIAGONALIZATION_CHARACTERISTIC_POLYNOMIAL` | The eigenvalues as l with P^T A P = diag(l) for an orthogonal P (det(xI - A) = prod (x - l_i)); every symmetric A has such P with l sorted. The diagonal entries in any order (the sorted order is one case); 1 <= k dropped. The general form bounds the sum over any k diagonal positions. |
 
 Distributed with HOL Light under the same license terms.

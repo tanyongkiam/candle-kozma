@@ -32,6 +32,8 @@ needs "kozma/make.ml";;
 One row per entry of the sheet, grouped by file. Theorems: the theorems that state the
 entry, or "planned" (not yet formalized) or "deferred" (left for later, as research
 scope). Remarks: how the statement differs from the printed one, or "As printed."
+"Partial" marks an entry proved only in part; "in progress" marks a file or entry whose
+formalization is still to be generalized.
 
 ### Finite sums (`finite_sums.ml`)
 
@@ -191,6 +193,10 @@ independence is `kwise_indep_rv_family`. Both use the joint CDFs of finite
 subfamilies, as the library's `mutually_indep_rv_seq` does (`INDEP_RV_FAMILY_SEQ`).
 Range hypotheses hold almost surely.
 
+In progress: independence is to be generalized to random elements with values in any
+measurable space (independence of the generated sigma-algebras), with the CDF form above
+as its real case.
+
 | Entry | Theorems | Remarks |
 |---|---|---|
 | kth moment 2 | `KTH_MOMENT_KWISE_INEQUALITY`, `KWISE_CENTRED_MOMENT_BOUND` | X_i in [0,1], k-wise independent, k even and k >= 2 (at k = 0 the printed constant is undefined), t > 0. The moment bound E[(X - mu)^k] <= C_k (nk/e)^(k/2) is proved first. |
@@ -218,6 +224,9 @@ Independence of a family of events E_i (i in any index set) is `indep_event_fami
 `event_mutually_indep`. Unimodality about m is `unimodal_about`, Khinchin's definition:
 the CDF is convex on (-inf,m) and concave on (m,inf); an atom at m is allowed.
 
+In progress: as for the concentration file, independence is to be generalized to random
+elements with values in any measurable space, with these definitions as special cases.
+
 | Entry | Theorems | Remarks |
 |---|---|---|
 | Kolmogorov | `KOLMOGOROV_INEQUALITY`, `KOLMOGOROV_INEQUALITY_GEN` | The maximum over 1 <= k <= n; finite variance as E[X_i^2] finite; n = 0 allowed. The general form has no mean-zero hypothesis and centres the partial sums. |
@@ -232,10 +241,13 @@ the CDF is convex on (-inf,m) and concave on (m,inf); an atom at m is allowed.
 
 ### Matrices (`matrix.ml`)
 
+In progress: Schur's inequalities are to be stated for matrices with complex
+eigenvalues; Hadamard's inequality is complete.
+
 | Entry | Theorems | Remarks |
 |---|---|---|
 | Hadamard | `HADAMARD_INEQUALITY` | As printed, for any real n by n matrix. |
-| Schur 1 | deferred | Needs complex matrices and their eigenvalues, which the library lacks. |
-| Schur 2 | `SCHUR_DIAGONAL_INEQUALITY`, `SCHUR_DIAGONAL_INEQUALITY_GEN`, `SYMMETRIC_MATRIX_DIAGONALIZABLE_SORTED`, `DIAGONALIZATION_CHARACTERISTIC_POLYNOMIAL` | The eigenvalues as l with P^T A P = diag(l) for an orthogonal P (det(xI - A) = prod (x - l_i)); every symmetric A has such P with l sorted. The diagonal entries in any order (the sorted order is one case); 1 <= k dropped. The general form bounds the sum over any k diagonal positions. |
+| Schur 1 | deferred | In progress: needs complex matrices and their eigenvalues, which the library lacks. |
+| Schur 2 | `SCHUR_DIAGONAL_INEQUALITY`, `SCHUR_DIAGONAL_INEQUALITY_GEN`, `SYMMETRIC_MATRIX_DIAGONALIZABLE_SORTED`, `DIAGONALIZATION_CHARACTERISTIC_POLYNOMIAL` | Partial, in progress: to be restated with matrices with complex eigenvalues (as Schur 1). Here the eigenvalues as l with P^T A P = diag(l) for an orthogonal P (det(xI - A) = prod (x - l_i)); every symmetric A has such P with l sorted. The diagonal entries in any order (the sorted order is one case); 1 <= k dropped. The general form bounds the sum over any k diagonal positions. |
 
 Distributed with HOL Light under the same license terms.
